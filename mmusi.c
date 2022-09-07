@@ -32,6 +32,13 @@ void mmusi_config()
 {
 
 	TCHAR ConfigFileNameFullPath[MAX_PATH];
+	char *last = strrchr(musdll_path, '\\');
+	if (last)
+	{
+		*last = '\0';
+	}
+	strncat(musdll_path, "\\", sizeof musdll_path - 1);
+	strcpy(ConfigFileNameFullPath, musdll_path);
 	LPCSTR ConfigFileName = "wgmus.ini";
 
 	*(strrchr(ConfigFileNameFullPath, '\\')+1)=0;
