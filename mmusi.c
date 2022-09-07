@@ -10,6 +10,8 @@ CRITICAL_SECTION cs;
 #define dprintf(...) if (fh) { fprintf(fh, __VA_ARGS__); fflush(NULL); }
 FILE *fh = NULL;
 
+char musdll_path[2048];
+
 int AudioLibrary;
 int FileFormat;
 int PlaybackMode;
@@ -45,7 +47,7 @@ void mmusi_config()
 
 int mmusi_main()
 {
-	mmusi_config();
+	mmusi_config;
 
 	return 0;
 }
@@ -56,8 +58,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	{
 		fh = fopen("mmusi.log", "w"); /* Renamed to .log*/
 
-		GetModuleFileName(hinstDLL, MusicFolder, sizeof MusicFolder);
+		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
 		dprintf("	dll attached\r\n");
+		dprintf("	musdll_path = %s\r\n", musdll_path);
 
 		InitializeCriticalSection(&cs);
 	}
@@ -74,25 +77,21 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE;
 }
 
+MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
+{
+}
 
 MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
 {
 }
 
-
-MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
+UINT WINAPI mmusi_auxGetNumDevs()
 {
 }
 
 MMRESULT WINAPI mmusi_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpcapsa, UINT cbCaps)
 {
 }
-
-
-UINT WINAPI mmusi_auxGetNumDevs()
-{
-}
-
 
 MMRESULT WINAPI mmusi_auxGetVolume(UINT uintDeviceID, LPDWORD lpdwVolume)
 {
