@@ -12,10 +12,12 @@ FILE *fh = NULL;
 
 char musdll_path[2048];
 
+/* Config File Defines start */
 int AudioLibrary;
 int FileFormat;
 int PlaybackMode;
 char MusicFolder[255];
+/* Config File Defines end */
 
 BOOL FileExists(LPCTSTR szPath)
 {
@@ -28,6 +30,7 @@ BOOL FileExists(LPCTSTR szPath)
 /* Get audio settings from <exe dir>/wgmmus.ini, set in global variables */
 void mmusi_config()
 {
+
 	TCHAR ConfigFileNameFullPath[MAX_PATH];
 	LPCSTR ConfigFileName = "wgmus.ini";
 
@@ -41,14 +44,13 @@ void mmusi_config()
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
 	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
 	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
-	
+
 	return;
 }
 
 int mmusi_main()
 {
-	mmusi_config;
-
+	mmusi_config();
 	return 0;
 }
 
@@ -63,6 +65,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		dprintf("	musdll_path = %s\r\n", musdll_path);
 
 		InitializeCriticalSection(&cs);
+		mmusi_config();
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)
