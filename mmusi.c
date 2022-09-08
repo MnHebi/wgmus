@@ -45,9 +45,7 @@ struct track_info
 
 static struct track_info tracks[MAX_TRACKS];
 
-int firstTrack = -1;
-int lastTrack = 0;
-int numTracks = 1; /* +1 for data track on mixed mode cd's */
+int numTracks = 0;
 
 /* CONFIG FILE DEFINES END */
 
@@ -149,7 +147,14 @@ void mmusi_config()
 	findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
 	do
 	{
-		dprintf("	Music tracks are: %s\r\n", MusicFiles.cFileName);	
+		numTracks++;
+		dprintf("	Number of tracks is: %d\r\n", numTracks);
+		dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
+		for (int i = 1; i < 18; i++)
+		{
+			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFiles.cFileName, MusicFolderFullPath, i);
+			dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
+		}
 	} while (FindNextFileA(findTracks, &MusicFiles) != 0);
 	FindClose(findTracks);
 
@@ -190,6 +195,61 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
 {
+	MCIERROR cmdErr;
+	if(TRUE)
+	{
+		dprintf("mciSendCommandA(deviceID=%p, uintMsg=%p, dwptrCmd=%p, dwParam=%p)\r\n", deviceID, uintMsg, dwptrCmd, dwParam);
+
+		if (uintMsg == MCI_OPEN)
+		{
+			dprintf("  MCI_OPEN\r\n");
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_PAUSE)
+		{
+			dprintf("  MCI_PAUSE\r\n");
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_STOP)
+		{
+			dprintf("  MCI_STOP\r\n");
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_CLOSE)
+		{
+			dprintf("  MCI_CLOSE\r\n");
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_STATUS)
+		{
+			LPMCI_STATUS_PARMS parms = (LPVOID)dwParam;
+
+			dprintf("  MCI_STATUS\r\n");
+
+			parms->dwReturn = 0;
+			
+			if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
+			{
+				dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n, numTracks");
+				parms->dwReturn = numTracks;
+			}
+			else
+			if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
+			{
+				dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
+				if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
+				{
+					parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+				}
+			}
+			return 0;
+		}
+	}
+	return cmdErr;
 }
 
 MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
@@ -244,7 +304,25 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			dprintf("	TIME FORMAT TMSF COMMAND SENT\r\n");
 			return 0;
 		}
+		if (strstr(lpszCmd, "status cdaudio number of tracks"))
+		{
+			static MCI_STATUS_PARMS parms;
+			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
+			dprintf("	NUMBER OF TRACKS STATUS COMMAND SENT\r\n");
+			return 0;
+		}
+		if (strstr(lpszCmd, "status cdaudio type track 1"))
+		{
+			static MCI_STATUS_PARMS parms;
+			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
+			parms.dwTrack = 1;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			dprintf("	STATUS TYPE TRACK 1 COMMAND SENT\r\n");
+			return 0;
+		}
 	}
+	return err;
 }
 
 UINT WINAPI mmusi_auxGetNumDevs()
