@@ -5,6 +5,12 @@
 #include <dirent.h>
 #include <string.h>
 
+/* AUDIO LIBRARY INCLUDES START */
+
+#include <bass/bass.h>
+
+/* AUDIO LIBRARY INCLUDES END */
+
 #define MAGIC_DEVICEID 0xBEEF
 #define MAX_TRACKS 99
 
@@ -37,15 +43,17 @@ WIN32_FIND_DATA MusicFiles;
 struct track_info
 {
     char path[MAX_PATH];    /* full path to track */
-	int current;
-	int next;
-	int first;
-	int last;	
 };
 
 static struct track_info tracks[MAX_TRACKS];
 
+struct track_info *info;
+
 int numTracks = 0;
+int firstTrack = -1;
+int lastTrack = 0;
+int currentTrack = -1;
+int nextTrack = 1;
 
 /* CONFIG FILE DEFINES END */
 
@@ -55,7 +63,7 @@ WAVEFORMATEX waveformat;
 
 /* WAVEOUT DEFINES END */
 
-/* BASS PLAYER DEFINES START 
+/* BASS PLAYER DEFINES START */
 HWND win;
 
 HSTREAM *strs;
@@ -65,7 +73,29 @@ int modc;
 HSAMPLE *sams;
 int samc;
 
- BASS PLAYER DEFINES END */
+HSTREAM str;
+
+/* BASS PLAYER DEFINES END */
+
+/* AUDIO PLAYBACK DEFINES START */
+
+int opened = 0;
+int paused = 1;
+int stopped = 1;
+int closed = 1;
+int playing = 0;
+int playeractive = 0;
+int timeFormat = MCI_FORMAT_MILLISECONDS;
+
+/* AUDIO PLAYBACK DEFINES END */
+
+ 
+int sortstring(const void* a, const void* b)
+{
+    const char *ia = (const char *)a;
+    const char *ib = (const char *)b;
+    return strcmp(ia, ib);
+}
 
 BOOL FileExists(LPCTSTR szPath)
 {
@@ -154,10 +184,29 @@ void mmusi_config()
 		{
 			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFiles.cFileName, MusicFolderFullPath, i);
 			dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
+			qsort(tracks[i].path, 16, sizeof(MAX_PATH), sortstring);
+			break;
 		}
 	} while (FindNextFileA(findTracks, &MusicFiles) != 0);
 	FindClose(findTracks);
-
+	if (numTracks > 0)
+	{
+		firstTrack = 1;
+		lastTrack = numTracks;
+		currentTrack = 1;
+		if (numTracks > 1)
+		{
+			nextTrack = 2;
+		}
+		else
+		nextTrack = 1;
+		dprintf("	Assigned First, Last, Current, and Next tracks\r\n");
+		dprintf("	First track %d\r\n", firstTrack);
+		dprintf("	Last track %d\r\n", lastTrack);
+		dprintf("	Current track %d\r\n", currentTrack);
+		dprintf("	Next track %d\r\n", nextTrack);
+	}
+	
 	return;
 }
 
@@ -188,6 +237,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
             fclose(fh);
             fh = NULL;
         }
+		if (AudioLibrary == 5)
+		{
+			BASS_Free();
+		}
     }
 
     return TRUE;
@@ -195,7 +248,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
 {
-	MCIERROR cmdErr;
 	if(TRUE)
 	{
 		dprintf("mciSendCommandA(deviceID=%p, uintMsg=%p, dwptrCmd=%p, dwParam=%p)\r\n", deviceID, uintMsg, dwptrCmd, dwParam);
@@ -203,24 +255,78 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 		if (uintMsg == MCI_OPEN)
 		{
 			dprintf("  MCI_OPEN\r\n");
+			if(opened == 0)
+			{
+				opened = 1;
+				closed = 0;
+				if(AudioLibrary == 5)
+				{				
+					if (playeractive == 0)
+					{
+						dprintf("	Audio library for commands is: BASS\r\n");	
+						BASS_Init(1, 44100, 0, win, NULL);
+						BASS_SetDevice(MAGIC_DEVICEID);
+						playeractive = 1;
+						dprintf("	BASS_Init\r\n");
+					}
+					else
+					if (playeractive == 1)
+					{
+						dprintf("	BASS already initialized, doing nothing\r\n");
+					}
+				}
+			}
 			return 0;
 		}
 		else
 		if (uintMsg == MCI_PAUSE)
 		{
 			dprintf("  MCI_PAUSE\r\n");
+			if(paused == 0)
+			{
+				paused = 1;
+				playing = 0;
+				if (AudioLibrary == 5)
+				{
+					BASS_Pause();
+					dprintf("	BASS_Pause\r\n");
+				}
+			}
 			return 0;
 		}
 		else
 		if (uintMsg == MCI_STOP)
 		{
 			dprintf("  MCI_STOP\r\n");
+			if(stopped == 0)
+			{
+				stopped = 1;
+				playing = 0;
+				if (AudioLibrary == 5)
+				{
+					BASS_Pause();
+					BASS_Stop();
+					dprintf("	BASS_Stop\r\n");
+				}
+				currentTrack = 1; /* Reset current track */
+				if (numTracks > 1)
+				{
+					nextTrack = 2; /* Reset next track */
+				}
+				else
+				nextTrack = 1; /* Reset next track */
+			}
 			return 0;
 		}
 		else
 		if (uintMsg == MCI_CLOSE)
 		{
 			dprintf("  MCI_CLOSE\r\n");
+			if(closed == 0)
+			{
+				closed = 1;
+				dprintf("	Ignoring close command since TA will still send commands after it, potentially causing freezes\r\n");
+			}
 			return 0;
 		}
 		else
@@ -234,7 +340,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			
 			if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 			{
-				dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n, numTracks");
+				dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", numTracks);
 				parms->dwReturn = numTracks;
 			}
 			else
@@ -246,10 +352,132 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					parms->dwReturn = MCI_CDA_TRACK_AUDIO;
 				}
 			}
+			else
+			if (parms->dwItem == MCI_STATUS_MODE)
+			{
+				dprintf("      MCI_STATUS_MODE\r\n");
+				if(opened)
+				{
+					dprintf("        we are open\r\n");
+					parms->dwReturn = MCI_MODE_OPEN;
+				}
+				else
+				if(paused)
+				{
+					dprintf("        we are paused\r\n");
+					parms->dwReturn = MCI_MODE_PAUSE;
+				}
+				else
+				if(stopped)
+				{
+					dprintf("        we are stopped\r\n");
+					parms->dwReturn = MCI_MODE_STOP;
+				}
+				else
+				if(playing)
+				{
+					dprintf("        we are playing\r\n");
+					parms->dwReturn = MCI_MODE_PLAY;
+				}
+			}
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_SET)
+		{
+			LPMCI_SET_PARMS parms = (LPVOID)dwParam;
+			
+			dprintf("  MCI_SET\r\n");
+			
+			if (dwptrCmd & MCI_SET_TIME_FORMAT)
+			{
+				dprintf("    MCI_SET_TIME_FORMAT\r\n");
+				timeFormat = parms->dwTimeFormat;
+				if (parms->dwTimeFormat == MCI_FORMAT_MILLISECONDS)
+				{
+					dprintf("      MCI_FORMAT_MILLISECONDS\r\n");
+				}
+				else
+				if (parms->dwTimeFormat == MCI_FORMAT_TMSF)
+				{
+					dprintf("      MCI_FORMAT_TMSF\r\n");
+				}
+			}
+			return 0;
+		}
+		else
+		if (uintMsg == MCI_PLAY)
+		{
+			dprintf("  MCI_PLAY\r\n");
+			
+			LPMCI_PLAY_PARMS parms = (LPVOID)dwParam;
+			if (paused == 1)
+			{
+				paused = 0;
+				if(playing == 1)
+				{
+					if (AudioLibrary == 5)
+					{
+						BASS_Start();
+						dprintf("	BASS_Start from paused\r\n");
+					}
+				}
+			}
+			else
+			if (stopped == 1)
+			{
+				stopped = 0;
+				if(playing == 1)
+				{
+					if (AudioLibrary == 5)
+					{
+						BASS_Start();
+						dprintf("	BASS_Start from stopped\r\n");
+					}
+				}
+			}
+			
+			if (dwptrCmd & MCI_FROM)
+			{
+				dprintf("  MCI_FROM\r\n");
+				currentTrack = parms->dwFrom - 1;
+				dprintf("	Current track is: %d\r\n", currentTrack);
+				if (AudioLibrary == 5)
+				{
+					str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, 0);
+					if (str) 
+					{
+						strc++;
+						strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
+						strs[strc - 1] = str;
+						dprintf("	BASS_StreamCreateFile\r\n");
+						playing = 1;
+						stopped = 0;
+						paused = 0;
+					}
+					else
+					dprintf("	BASS cannot stream the file!\r\n");
+				}
+			}
+			else
+			if (dwptrCmd & MCI_TO)
+			{
+				dprintf("  MCI_TO\r\n");
+				nextTrack = parms->dwTo - 1;
+				dprintf("	Next track is: %d\r\n", nextTrack);
+				if (playing == 1)
+				{
+					if (AudioLibrary == 5)
+					{
+						BASS_StreamPutFileData(str, tracks[nextTrack].path, BASS_FILEDATA_END);
+						dprintf("	BASS_StreamPutFileData\r\n");
+					}
+				}
+			}
 			return 0;
 		}
 	}
-	return cmdErr;
+	return MCIERR_UNRECOGNIZED_COMMAND;
 }
 
 MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
@@ -319,6 +547,24 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			parms.dwTrack = 1;
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			dprintf("	STATUS TYPE TRACK 1 COMMAND SENT\r\n");
+			return 0;
+		}
+		if (strstr(lpszCmd, "status cdaudio mode"))
+		{
+			static MCI_STATUS_PARMS parms;
+			parms.dwItem = MCI_STATUS_MODE;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_STATUS_MODE, (DWORD_PTR)&parms);
+			dprintf("	STATUS MODE COMMAND SENT\r\n");
+			return 0;
+		}
+		int from = -1, to = -1;
+		if (sscanf(lpszCmd, "play cdaudio from %d to %d notify", &from, &to) == 2)
+		{
+			static MCI_PLAY_PARMS parms;
+			parms.dwFrom = from;
+			parms.dwTo = to;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM|MCI_TO|MCI_NOTIFY, (DWORD_PTR)&parms);
+			dprintf("	PLAY FROM TO COMMAND SENT\r\n");
 			return 0;
 		}
 	}
