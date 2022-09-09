@@ -35,6 +35,7 @@ char strFileFormat[5];
 TCHAR MusicFolderFullPath[MAX_PATH];
 char strMusicFile[32];
 TCHAR MusicFileFullPath[MAX_PATH];
+TCHAR MusicFileStoredPath[MAX_PATH];
 HANDLE findTracks = INVALID_HANDLE_VALUE;
 WIN32_FIND_DATA MusicFiles;
 
@@ -59,7 +60,12 @@ int nextTrack = 1;
 
 /* WAVEOUT DEFINES START */
 
-WAVEFORMATEX waveformat;
+WAVEFORMATEX plr_fmt;
+HWAVEOUT plr_hwo = NULL;
+HANDLE plr_evt = NULL;
+int	plr_cnt	= 0;
+int	plr_vol	= 100;
+WAVEHDR	*plr_buf[3] = { NULL, NULL, NULL };
 
 /* WAVEOUT DEFINES END */
 
@@ -74,6 +80,7 @@ HSAMPLE *sams;
 int samc;
 
 HSTREAM str;
+BASS_CHANNELINFO cinfo;
 
 /* BASS PLAYER DEFINES END */
 
@@ -182,9 +189,12 @@ void mmusi_config()
 		dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
 		for (int i = 1; i < 18; i++)
 		{
-			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFiles.cFileName, MusicFolderFullPath, i);
+			strcpy(MusicFileStoredPath, MusicFolderFullPath);
+			strcat(MusicFileStoredPath, "\\");
+			strcat(MusicFileStoredPath, MusicFiles.cFileName);
+			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
 			dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
-			qsort(tracks[i].path, 16, sizeof(MAX_PATH), sortstring);
+			/*qsort(tracks[i].path, 16, sizeof(MAX_PATH), sortstring);*/
 			break;
 		}
 	} while (FindNextFileA(findTracks, &MusicFiles) != 0);
@@ -441,7 +451,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			{
 				dprintf("  MCI_FROM\r\n");
 				currentTrack = parms->dwFrom - 1;
-				dprintf("	Current track is: %d\r\n", currentTrack);
+				dprintf("	Current track is: %s\r\n", tracks[currentTrack].path);
 				if (AudioLibrary == 5)
 				{
 					str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, 0);
@@ -454,6 +464,52 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						playing = 1;
 						stopped = 0;
 						paused = 0;
+						
+						BASS_ChannelGetInfo(str, &cinfo);
+						
+						plr_fmt.wFormatTag 		= WAVE_FORMAT_PCM;
+						plr_fmt.nChannels       = cinfo.chans;
+						plr_fmt.nSamplesPerSec  = cinfo.freq;
+						plr_fmt.wBitsPerSample  = (cinfo.flags & BASS_SAMPLE_8BITS ? 8 : 16);
+						plr_fmt.nBlockAlign     = plr_fmt.nChannels * (plr_fmt.wBitsPerSample / 8);
+						plr_fmt.nAvgBytesPerSec = plr_fmt.nBlockAlign * plr_fmt.nSamplesPerSec;
+						plr_fmt.cbSize          = 0;
+						
+						plr_evt = CreateEvent(NULL, 0, 1, NULL);
+
+						waveOutOpen(&plr_hwo, WAVE_MAPPER, &plr_fmt, (DWORD_PTR)plr_evt, 0, CALLBACK_EVENT);
+						
+						DWORD strBuf = BASS_ChannelGetLength(str, BASS_POS_BYTE);
+						dprintf("	stream buffer in bytes:%d\r\n", strBuf);
+						int bufsize = plr_fmt.nAvgBytesPerSec / 4; /* 250ms (avg at 500ms) should be enough for everyone */
+						char *buf = malloc(bufsize);
+						
+						WAVEHDR *header = malloc(sizeof(WAVEHDR));
+						header->dwBufferLength   = strBuf;
+						header->lpData           = buf;
+						header->dwUser           = 0;
+						header->dwFlags          = plr_cnt == 0 ? WHDR_BEGINLOOP : 0;
+						header->dwLoops          = 0;
+						header->lpNext           = NULL;
+						header->reserved         = 0;
+						
+						dprintf("	WAVEHDR DEFINED\r\n");
+
+						waveOutPrepareHeader(plr_hwo, header, sizeof(WAVEHDR));
+						
+						dprintf("	waveOut header prepared\r\n");
+						
+						if (plr_cnt > 1)
+						{
+							WaitForSingleObject(plr_evt, INFINITE);
+						}
+						
+						dprintf("	Waiting for player event\r\n");
+
+						waveOutWrite(plr_hwo, header, sizeof(WAVEHDR));
+						plr_buf[3] = header;
+						
+						plr_cnt++;
 					}
 					else
 					dprintf("	BASS cannot stream the file!\r\n");
@@ -464,7 +520,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			{
 				dprintf("  MCI_TO\r\n");
 				nextTrack = parms->dwTo - 1;
-				dprintf("	Next track is: %d\r\n", nextTrack);
+				dprintf("	Next track is: %s\r\n", tracks[nextTrack].path);
 				if (playing == 1)
 				{
 					if (AudioLibrary == 5)
