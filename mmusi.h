@@ -1,0 +1,1 @@
+void mmusi_config();
