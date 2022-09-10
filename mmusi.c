@@ -195,21 +195,18 @@ void mmusi_config()
 	strcat(strMusicFile, strFileFormat);
 	strcat(MusicFileFullPath, strMusicFile);
 	findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
+	int i = 0;
 	do
 	{
 		numTracks++;
 		dprintf("	Number of tracks is: %d\r\n", numTracks);
 		dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
-		for (int i = 1; i < 18; i++)
-		{
-			strcpy(MusicFileStoredPath, MusicFolderFullPath);
-			strcat(MusicFileStoredPath, "\\");
-			strcat(MusicFileStoredPath, MusicFiles.cFileName);
-			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
-			dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
-			/*qsort(tracks[i].path, 16, sizeof(MAX_PATH), sortstring);*/
-			break;
-		}
+		strcpy(MusicFileStoredPath, MusicFolderFullPath);
+		strcat(MusicFileStoredPath, "\\");
+		strcat(MusicFileStoredPath, MusicFiles.cFileName);
+		snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
+		dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
+		i++;
 	} while (FindNextFileA(findTracks, &MusicFiles) != 0);
 	FindClose(findTracks);
 	if (numTracks > 0)
@@ -235,7 +232,26 @@ void mmusi_config()
 
 int bass_play(const char *path)
 {
-	DWORD strBuf = BASS_ChannelGetData(str, NULL, BASS_DATA_AVAILABLE);
+	bool strFree = BASS_ChannelFree(str);
+	str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
+	if (str) 
+	{
+		strc++;
+		strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
+		strs[strc - 1] = str;
+		dprintf("	BASS_StreamCreateFile\r\n");
+	}
+	else
+	dprintf("	BASS cannot stream the file!\r\n");
+
+	bool strPlay = BASS_ChannelPlay(str, FALSE);
+	DWORD bassDeviceCheck = BASS_ChannelGetDevice(str);
+	int bassError = BASS_ErrorGetCode();
+	dprintf("	BASS device: %d\r\n", bassDeviceCheck);
+	
+	float fft[32768];
+	DWORD strBuf = BASS_ChannelGetData(str, fft, BASS_DATA_FFT_INDIVIDUAL);
+	dprintf("	BASS Error: %d\r\n", bassError);
 	BASS_ChannelGetInfo(str, &cinfo);
 						
 	plr_fmt.wFormatTag 		= WAVE_FORMAT_PCM;
@@ -416,6 +432,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			if(closed == 0)
 			{
 				closed = 1;
+				opened = 0;
 				dprintf("	Ignoring close command since TA will still send commands after it, potentially causing freezes\r\n");
 			}
 			return 0;
@@ -537,20 +554,11 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				dprintf("	Current track is: %s\r\n", tracks[currentTrack].path);
 				if (AudioLibrary == 5)
 				{
-					str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, 0);
-					if (str) 
-					{
-						strc++;
-						strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
-						strs[strc - 1] = str;
-						dprintf("	BASS_StreamCreateFile\r\n");
-						playing = 1;
-						stopped = 0;
-						paused = 0;
-						bass_play(tracks[currentTrack].path);
-					}
-					else
-					dprintf("	BASS cannot stream the file!\r\n");
+					playing = 1;
+					stopped = 0;
+					paused = 0;
+					closed = 0;
+					bass_play(tracks[currentTrack].path);
 				}
 			}
 			else
