@@ -1,9 +1,15 @@
 #include <windows.h>
+#include <mmsystem.h>
 #include <winreg.h>
+
+#include <conio.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <string.h>
+#include <math.h>
 
 /* AUDIO LIBRARY INCLUDES START */
 
@@ -60,12 +66,19 @@ int nextTrack = 1;
 
 /* WAVEOUT DEFINES START */
 
+#define CHUNK_SIZE 2000
+#define TWOPI (M_PI + M_PI)
+
 WAVEFORMATEX plr_fmt;
 HWAVEOUT plr_hwo = NULL;
-HANDLE plr_evt = NULL;
 int	plr_cnt	= 0;
 int	plr_vol	= 100;
-WAVEHDR	*plr_buf[3] = { NULL, NULL, NULL };
+WAVEHDR header[2] = {0};
+int16_t chunks[2][CHUNK_SIZE];
+bool chunk_swap = false;
+float frequency = 400;
+float wave_position = 0;
+float wave_step;
 
 /* WAVEOUT DEFINES END */
 
@@ -220,6 +233,70 @@ void mmusi_config()
 	return;
 }
 
+int bass_play(const char *path)
+{
+	DWORD strBuf = BASS_ChannelGetData(str, NULL, BASS_DATA_AVAILABLE);
+	BASS_ChannelGetInfo(str, &cinfo);
+						
+	plr_fmt.wFormatTag 		= WAVE_FORMAT_PCM;
+	plr_fmt.nChannels       = cinfo.chans;
+	plr_fmt.nSamplesPerSec  = cinfo.freq;
+	plr_fmt.wBitsPerSample  = (cinfo.flags & BASS_SAMPLE_8BITS ? 8 : 16);
+	plr_fmt.nBlockAlign     = plr_fmt.nChannels * (plr_fmt.wBitsPerSample / 8);
+	plr_fmt.nAvgBytesPerSec = plr_fmt.nBlockAlign * plr_fmt.nSamplesPerSec;
+	plr_fmt.cbSize          = 0;
+	
+	dprintf("	waveformatex tag is: %d\r\n", plr_fmt.wFormatTag);
+	dprintf("	waveformatex has this many channels: %d\r\n", plr_fmt.nChannels);
+	dprintf("	waveformatex frequency is: %d\r\n", plr_fmt.nSamplesPerSec);
+	dprintf("	waveformatex bits per sample is: %d\r\n", plr_fmt.wBitsPerSample);	
+	dprintf("	waveformatex block align is: %d\r\n", plr_fmt.nBlockAlign);		
+	dprintf("	waveformatex average bytes per second are: %d\r\n", plr_fmt.nAvgBytesPerSec);	
+
+	wave_step = TWOPI / ((float)plr_fmt.nSamplesPerSec / frequency);
+
+	for(int i = 0; i < 2; ++i) {
+		for(int j = 0; j < CHUNK_SIZE; ++j) 
+		{
+			dprintf("	Bass sample length in bytes: %d\r\n", strBuf);
+			chunks[i][j] = strBuf;
+		}
+		header[i].lpData = (CHAR*)chunks[i];
+		header[i].dwBufferLength = CHUNK_SIZE * 2;
+		if(waveOutPrepareHeader(plr_hwo, &header[i], sizeof(header[i])) != MMSYSERR_NOERROR) 
+		{
+			dprintf("	waveOutPrepareHeader[%d] failed\r\n", i);
+			return -1;
+		}
+		if(waveOutWrite(plr_hwo, &header[i], sizeof(header[i])) != MMSYSERR_NOERROR) 
+		{
+			dprintf("	waveOutWrite[%d] failed\r\n", i);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+void CALLBACK WaveOutProc(HWAVEOUT wave_out_handle, UINT message, DWORD_PTR instance, DWORD_PTR param1, DWORD_PTR param2) {
+	switch(message) 
+	{
+		case WOM_CLOSE: printf("WOM_CLOSE\n"); break;
+		case WOM_OPEN:  printf("WOM_OPEN\n");  break;
+		case WOM_DONE:{ printf("WOM_DONE\n");
+			for(int i = 0; i < CHUNK_SIZE; ++i) 
+			{
+				DWORD strBuf = BASS_ChannelGetData(str, NULL, BASS_DATA_AVAILABLE);
+				dprintf("	Bass sample length in bytes: %d\r\n", strBuf);
+				chunks[chunk_swap][i] = strBuf;
+			}
+			if(waveOutWrite(plr_hwo, &header[chunk_swap], sizeof(header[chunk_swap])) != MMSYSERR_NOERROR) {
+				dprintf("	waveOutWrite failed\r\n");
+			}
+			chunk_swap = !chunk_swap;
+		} break;
+	}
+}
+
 int mmusi_main()
 {
 	mmusi_config();
@@ -247,6 +324,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
             fclose(fh);
             fh = NULL;
         }
+		if (AudioLibrary == 2)
+		{
+			mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
+		}
 		if (AudioLibrary == 5)
 		{
 			BASS_Free();
@@ -275,7 +356,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					{
 						dprintf("	Audio library for commands is: BASS\r\n");	
 						BASS_Init(1, 44100, 0, win, NULL);
-						BASS_SetDevice(MAGIC_DEVICEID);
+						/*BASS_SetDevice(MAGIC_DEVICEID);*/
 						playeractive = 1;
 						dprintf("	BASS_Init\r\n");
 					}
@@ -450,7 +531,9 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			if (dwptrCmd & MCI_FROM)
 			{
 				dprintf("  MCI_FROM\r\n");
-				currentTrack = parms->dwFrom - 1;
+				currentTrack = (int)(parms->dwFrom);
+				dprintf("	From value: %d\r\n", parms->dwFrom);
+				dprintf("	Current track int value is: %d\r\n", currentTrack);
 				dprintf("	Current track is: %s\r\n", tracks[currentTrack].path);
 				if (AudioLibrary == 5)
 				{
@@ -464,52 +547,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						playing = 1;
 						stopped = 0;
 						paused = 0;
-						
-						BASS_ChannelGetInfo(str, &cinfo);
-						
-						plr_fmt.wFormatTag 		= WAVE_FORMAT_PCM;
-						plr_fmt.nChannels       = cinfo.chans;
-						plr_fmt.nSamplesPerSec  = cinfo.freq;
-						plr_fmt.wBitsPerSample  = (cinfo.flags & BASS_SAMPLE_8BITS ? 8 : 16);
-						plr_fmt.nBlockAlign     = plr_fmt.nChannels * (plr_fmt.wBitsPerSample / 8);
-						plr_fmt.nAvgBytesPerSec = plr_fmt.nBlockAlign * plr_fmt.nSamplesPerSec;
-						plr_fmt.cbSize          = 0;
-						
-						plr_evt = CreateEvent(NULL, 0, 1, NULL);
-
-						waveOutOpen(&plr_hwo, WAVE_MAPPER, &plr_fmt, (DWORD_PTR)plr_evt, 0, CALLBACK_EVENT);
-						
-						DWORD strBuf = BASS_ChannelGetLength(str, BASS_POS_BYTE);
-						dprintf("	stream buffer in bytes:%d\r\n", strBuf);
-						int bufsize = plr_fmt.nAvgBytesPerSec / 4; /* 250ms (avg at 500ms) should be enough for everyone */
-						char *buf = malloc(bufsize);
-						
-						WAVEHDR *header = malloc(sizeof(WAVEHDR));
-						header->dwBufferLength   = strBuf;
-						header->lpData           = buf;
-						header->dwUser           = 0;
-						header->dwFlags          = plr_cnt == 0 ? WHDR_BEGINLOOP : 0;
-						header->dwLoops          = 0;
-						header->lpNext           = NULL;
-						header->reserved         = 0;
-						
-						dprintf("	WAVEHDR DEFINED\r\n");
-
-						waveOutPrepareHeader(plr_hwo, header, sizeof(WAVEHDR));
-						
-						dprintf("	waveOut header prepared\r\n");
-						
-						if (plr_cnt > 1)
-						{
-							WaitForSingleObject(plr_evt, INFINITE);
-						}
-						
-						dprintf("	Waiting for player event\r\n");
-
-						waveOutWrite(plr_hwo, header, sizeof(WAVEHDR));
-						plr_buf[3] = header;
-						
-						plr_cnt++;
+						bass_play(tracks[currentTrack].path);
 					}
 					else
 					dprintf("	BASS cannot stream the file!\r\n");
@@ -519,7 +557,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			if (dwptrCmd & MCI_TO)
 			{
 				dprintf("  MCI_TO\r\n");
-				nextTrack = parms->dwTo - 1;
+				nextTrack = parms->dwTo;
 				dprintf("	Next track is: %s\r\n", tracks[nextTrack].path);
 				if (playing == 1)
 				{
@@ -550,6 +588,8 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		
 		if (strstr(lpszCmd, "open cdaudio"))
 		{
+			static MCI_WAVE_OPEN_PARMS waveParms;
+			dprintf("  MCI_OPEN\r\n");
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
 			dprintf("	OPEN COMMAND SENT\r\n");
 			return 0;
@@ -568,14 +608,14 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		}
 		if (strstr(lpszCmd, "close cdaudio"))
 		{
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
+			mmusi_mciSendCommandA(0, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			dprintf("	CLOSE COMMAND SENT\r\n");
 			return 0;
 		}
 		if (strstr(lpszCmd, "set cdaudio time format milliseconds"))
 		{
 			static MCI_SET_PARMS parms;
-			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;
+			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;	
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
 			dprintf("	TIME FORMAT MILLISECONDS COMMAND SENT\r\n");
 			return 0;
@@ -592,8 +632,9 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
+			mmusi_mciSendCommandA(0, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
 			dprintf("	NUMBER OF TRACKS STATUS COMMAND SENT\r\n");
+			sprintf(lpszRetStr, "%d", numTracks);
 			return 0;
 		}
 		if (strstr(lpszCmd, "status cdaudio type track 1"))
@@ -603,6 +644,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			parms.dwTrack = 1;
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			dprintf("	STATUS TYPE TRACK 1 COMMAND SENT\r\n");
+			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
 		}
 		if (strstr(lpszCmd, "status cdaudio mode"))
