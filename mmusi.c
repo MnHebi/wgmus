@@ -59,6 +59,7 @@ int lastTrack = 0;
 int currentTrack = -1;
 int nextTrack = 1;
 int notify = 0;
+int queriedTrack = 0;
 
 /* CONFIG FILE DEFINES END */
 
@@ -465,9 +466,23 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
 						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+						if (dwptrCmd & MCI_TRACK)
+						{
+							queriedTrack = (int)(parms->dwTrack);
+							if(timeFormat == MCI_FORMAT_MILLISECONDS)
+							{
+								parms->dwReturn = queriedTrack;
+							}
+							else
+							if(timeFormat == MCI_FORMAT_TMSF)
+							{
+								parms->dwReturn = MCI_MAKE_TMSF(queriedTrack, 0, 0, 0);
+							}
+						}
+						
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
-							parms->dwReturn = bassMilliseconds;
+							parms->dwReturn = currentTrack;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
@@ -479,7 +494,6 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						}
 					}
 				}
-				else
 				if (parms->dwItem == MCI_STATUS_MODE)
 				{
 					dprintf("      MCI_STATUS_MODE\r\n");
@@ -738,9 +752,19 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			parms.dwItem = MCI_STATUS_CURRENT_TRACK;
 			parms.dwTrack = currentTrack;
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			sprintf(lpszRetStr, "%d", parms.dwReturn);	
 			return 0;
 		}
 		if (strstr(lpszCmd, "position"))
+		{
+			static MCI_STATUS_PARMS parms;
+			parms.dwItem = MCI_STATUS_POSITION;
+			parms.dwTrack = 1;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			sprintf(lpszRetStr, "%d", parms.dwReturn);
+			return 0;
+        }
+		if (strstr(lpszCmd, "position track 1"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
