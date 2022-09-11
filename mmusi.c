@@ -11,6 +11,7 @@
 /* AUDIO LIBRARY INCLUDES START */
 
 #include <bass/bass.h>
+#include <bass/basscd.h>
 
 /* AUDIO LIBRARY INCLUDES END */
 
@@ -50,6 +51,7 @@ struct track_info
 };
 
 static struct track_info tracks[MAX_TRACKS];
+DWORD cdTracks = 0;
 
 struct track_info *info;
 
@@ -60,6 +62,7 @@ int currentTrack = -1;
 int nextTrack = 1;
 int notify = 0;
 int queriedTrack = 0;
+DWORD queriedCdTrack = 0;
 
 /* CONFIG FILE DEFINES END */
 
@@ -175,37 +178,49 @@ void mmusi_config()
 	strcpy(strMusicFile, "*");
 	strcat(strMusicFile, strFileFormat);
 	strcat(MusicFileFullPath, strMusicFile);
-	findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
-	int i = 2;
-	do
+	if (PlaybackMode == 0)
 	{
-		numTracks++;
-		dprintf("	Number of tracks is: %d\r\n", numTracks);
-		dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
-		strcpy(MusicFileStoredPath, MusicFolderFullPath);
-		strcat(MusicFileStoredPath, "\\");
-		strcat(MusicFileStoredPath, MusicFiles.cFileName);
-		snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
-		dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
-		i++;
-	} while (FindNextFileA(findTracks, &MusicFiles) != 0);
-	FindClose(findTracks);
-	if (numTracks > 0)
-	{
-		firstTrack = 1;
-		lastTrack = numTracks;
-		currentTrack = 1;
-		if (numTracks > 1)
+		if (AudioLibrary == 5)
 		{
-			nextTrack = 2;
+			cdTracks = BASS_CD_GetTracks(0);
+			dprintf("	Number of tracks on CD is: %d\r\n", cdTracks);
 		}
-		else
-		nextTrack = 1;
-		dprintf("	Assigned First, Last, Current, and Next tracks\r\n");
-		dprintf("	First track %d\r\n", firstTrack);
-		dprintf("	Last track %d\r\n", lastTrack);
-		dprintf("	Current track %d\r\n", currentTrack);
-		dprintf("	Next track %d\r\n", nextTrack);
+	}
+	else
+	if (PlaybackMode == 1)
+	{
+		findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
+		int i = 2;
+		do
+		{
+			numTracks++;
+			dprintf("	Number of tracks is: %d\r\n", numTracks);
+			dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
+			strcpy(MusicFileStoredPath, MusicFolderFullPath);
+			strcat(MusicFileStoredPath, "\\");
+			strcat(MusicFileStoredPath, MusicFiles.cFileName);
+			snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
+			dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
+			i++;
+		} while (FindNextFileA(findTracks, &MusicFiles) != 0);
+		FindClose(findTracks);
+		if (numTracks > 0)
+		{
+			firstTrack = 1;
+			lastTrack = numTracks;
+			currentTrack = 1;
+			if (numTracks > 1)
+			{
+				nextTrack = 2;
+			}
+			else
+			nextTrack = 1;
+			dprintf("	Assigned First, Last, Current, and Next tracks\r\n");
+			dprintf("	First track %d\r\n", firstTrack);
+			dprintf("	Last track %d\r\n", lastTrack);
+			dprintf("	Current track %d\r\n", currentTrack);
+			dprintf("	Next track %d\r\n", nextTrack);
+		}
 	}
 	
 	return;
@@ -229,16 +244,32 @@ int bass_resume()
 int bass_play(const char *path)
 {
 	BASS_ChannelFree(str);
-	str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
-	if (str) 
+	if (PlaybackMode == 0)
 	{
-		strc++;
-		strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
-		strs[strc - 1] = str;
-		dprintf("	BASS_StreamCreateFile\r\n");
+		str = BASS_CD_StreamCreate(0, currentTrack, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
+		if (str) 
+		{
+			strc++;
+			strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
+			strs[strc - 1] = str;
+			dprintf("	BASS_CD_StreamCreate\r\n");
+		}
+		else
+		dprintf("	BASS cannot stream the CD!\r\n");
 	}
-	else
-	dprintf("	BASS cannot stream the file!\r\n");
+	if (PlaybackMode == 1)
+	{
+		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
+		if (str) 
+		{
+			strc++;
+			strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
+			strs[strc - 1] = str;
+			dprintf("	BASS_StreamCreateFile\r\n");
+		}
+		else
+		dprintf("	BASS cannot stream the file!\r\n");
+	}
 
 	bool strPlay = BASS_ChannelPlay(str, FALSE);
 	DWORD bassDeviceCheck = BASS_ChannelGetDevice(str);
@@ -263,21 +294,21 @@ int bass_play(const char *path)
 	}
 	if (bassActivity == BASS_ACTIVE_PLAYING)
 	{
-		dprintf("	BASS playing");
+		dprintf("	BASS playing\r\n");
 	}
 	if (bassActivity == BASS_ACTIVE_PAUSED)
 	{
-		dprintf("	BASS activity was paused during playback");
+		dprintf("	BASS activity was paused during playback\r\n");
 		BASS_Start();
 	}
 	if (bassActivity == BASS_ACTIVE_PAUSED_DEVICE)
 	{
-		dprintf("	BASS Device was paused during playback");
+		dprintf("	BASS Device was paused during playback\r\n");
 		BASS_Start();
 	}
 	if (bassActivity == BASS_ACTIVE_STALLED)
 	{
-		dprintf("	BASS playback was stalled");
+		dprintf("	BASS playback was stalled\r\n");
 		BASS_StreamPutFileData(str, tracks[nextTrack].path, BASS_FILEDATA_END);
 	}
 
@@ -431,97 +462,205 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				dprintf("  MCI_STATUS\r\n");
 
 				parms->dwReturn = 0;
-				if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
+				
+				if (PlaybackMode == 0)
 				{
-					dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", numTracks);
-					parms->dwReturn = numTracks;
-				}
-				else
-				if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
-				{
-					dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
-					if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
+					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 					{
-						parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+						dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", cdTracks);
+						parms->dwReturn = cdTracks;
 					}
-				}
-				else
-				if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
-				{
-					dprintf("	Sending current track: %d\r\n", currentTrack);
-					parms->dwReturn = currentTrack;
-				}
-				else
-				if (parms->dwItem == MCI_STATUS_POSITION)
-				{
-					char trackNumber[3];
-					char trackSeconds[3];
-					char trackMilliseconds[3];
-					if (AudioLibrary == 5)
+					else
+					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
-						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
-						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
-						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
-						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
-						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
-						if (dwptrCmd & MCI_TRACK)
+						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
+						if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
 						{
-							queriedTrack = (int)(parms->dwTrack);
+							if (AudioLibrary == 5)
+							{
+								DWORD bassCdTrackLength = BASS_CD_GetTrackLength(0, parms->dwTrack);
+								if (bassCdTrackLength >= 0)
+								{
+									parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+								}
+								else
+								parms->dwReturn = MCI_CDA_TRACK_OTHER;
+							}
+						}
+					}
+					else
+					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
+					{
+						dprintf("	Sending current track: %d\r\n", currentTrack);
+						parms->dwReturn = currentTrack;
+					}
+					else
+					if (parms->dwItem == MCI_STATUS_POSITION)
+					{
+						char trackNumber[3];
+						char trackSeconds[3];
+						char trackMilliseconds[3];
+						if (AudioLibrary == 5)
+						{
+							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
+							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
+							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+							int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
+							int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
+							int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+							if (dwptrCmd & MCI_TRACK)
+							{
+								queriedCdTrack = parms->dwTrack;
+								if(timeFormat == MCI_FORMAT_MILLISECONDS)
+								{
+									parms->dwReturn = queriedCdTrack;
+								}
+								else
+								if(timeFormat == MCI_FORMAT_TMSF)
+								{
+									parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
+								}
+							}
+						
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
-								parms->dwReturn = queriedTrack;
+								parms->dwReturn = currentTrack;
 							}
 							else
 							if(timeFormat == MCI_FORMAT_TMSF)
 							{
-								parms->dwReturn = MCI_MAKE_TMSF(queriedTrack, 0, 0, 0);
+								snprintf(trackNumber, 3, "%02d", currentTrack);
+								snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
+								snprintf(trackSeconds, 3, "%02d", bassMinutes);
+								parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
 							}
 						}
-						
-						if(timeFormat == MCI_FORMAT_MILLISECONDS)
+					}
+					if (parms->dwItem == MCI_STATUS_MODE)
+					{
+						dprintf("      MCI_STATUS_MODE\r\n");
+						if(opened && !(playing))
 						{
-							parms->dwReturn = currentTrack;
+							dprintf("        we are open\r\n");
+							parms->dwReturn = MCI_MODE_OPEN;
 						}
 						else
-						if(timeFormat == MCI_FORMAT_TMSF)
+						if(paused)
 						{
-							snprintf(trackNumber, 3, "%02d", currentTrack);
-							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-							snprintf(trackSeconds, 3, "%02d", bassMinutes);
-							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+							dprintf("        we are paused\r\n");
+							parms->dwReturn = MCI_MODE_PAUSE;
+						}
+						else
+						if(stopped)
+						{
+							dprintf("        we are stopped\r\n");
+							parms->dwReturn = MCI_MODE_STOP;
+						}
+						else
+						if(playing)
+						{
+							dprintf("        we are playing\r\n");
+							parms->dwReturn = MCI_MODE_PLAY;
 						}
 					}
+					return 0;
 				}
-				if (parms->dwItem == MCI_STATUS_MODE)
+				else
+				if (PlaybackMode == 1)
 				{
-					dprintf("      MCI_STATUS_MODE\r\n");
-					if(opened && !(playing))
+					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 					{
-						dprintf("        we are open\r\n");
-						parms->dwReturn = MCI_MODE_OPEN;
+						dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", numTracks);
+						parms->dwReturn = numTracks;
 					}
 					else
-					if(paused)
+					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
-						dprintf("        we are paused\r\n");
-						parms->dwReturn = MCI_MODE_PAUSE;
+						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
+						if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
+						{
+							parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+						}
 					}
 					else
-					if(stopped)
+					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
 					{
-						dprintf("        we are stopped\r\n");
-						parms->dwReturn = MCI_MODE_STOP;
+						dprintf("	Sending current track: %d\r\n", currentTrack);
+						parms->dwReturn = currentTrack;
 					}
 					else
-					if(playing)
+					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						dprintf("        we are playing\r\n");
-						parms->dwReturn = MCI_MODE_PLAY;
+						char trackNumber[3];
+						char trackSeconds[3];
+						char trackMilliseconds[3];
+						if (AudioLibrary == 5)
+						{
+							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
+							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
+							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+							int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
+							int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
+							int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+							if (dwptrCmd & MCI_TRACK)
+							{
+								queriedTrack = (int)(parms->dwTrack);
+								if(timeFormat == MCI_FORMAT_MILLISECONDS)
+								{
+									parms->dwReturn = queriedTrack;
+								}
+								else
+								if(timeFormat == MCI_FORMAT_TMSF)
+								{
+									parms->dwReturn = MCI_MAKE_TMSF(queriedTrack, 0, 0, 0);
+								}
+							}
+						
+							if(timeFormat == MCI_FORMAT_MILLISECONDS)
+							{
+								parms->dwReturn = currentTrack;
+							}
+							else
+							if(timeFormat == MCI_FORMAT_TMSF)
+							{
+								snprintf(trackNumber, 3, "%02d", currentTrack);
+								snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
+								snprintf(trackSeconds, 3, "%02d", bassMinutes);
+								parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+							}
+						}
 					}
+					if (parms->dwItem == MCI_STATUS_MODE)
+					{
+						dprintf("      MCI_STATUS_MODE\r\n");
+						if(opened && !(playing))
+						{
+							dprintf("        we are open\r\n");
+							parms->dwReturn = MCI_MODE_OPEN;
+						}
+						else
+						if(paused)
+						{
+							dprintf("        we are paused\r\n");
+							parms->dwReturn = MCI_MODE_PAUSE;
+						}
+						else
+						if(stopped)
+						{
+							dprintf("        we are stopped\r\n");
+							parms->dwReturn = MCI_MODE_STOP;
+						}
+						else
+						if(playing)
+						{
+							dprintf("        we are playing\r\n");
+							parms->dwReturn = MCI_MODE_PLAY;
+						}
+					}
+					return 0;
 				}
-				return 0;
 			}
 			else
 			if (uintMsg == MCI_SET)
@@ -687,6 +826,8 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			tolower(lpszCmd[i]);
 		}
 		
+		int cTrack = 0;
+		
 		if (strstr(lpszCmd, "open cdaudio"))
 		{
 			static MCI_WAVE_OPEN_PARMS waveParms;
@@ -730,11 +871,11 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			sprintf(lpszRetStr, "%d", numTracks);
 			return 0;
 		}
-		if (strstr(lpszCmd, "status cdaudio type track 1"))
+		if (sscanf(lpszCmd, "status cdaudio type track %d", &cTrack))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
-			parms.dwTrack = 1;
+			parms.dwTrack = cTrack;
 			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
@@ -764,11 +905,12 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
         }
-		if (strstr(lpszCmd, "position track 1"))
+		if (sscanf(lpszCmd, "position track %d", &cTrack))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
+			parms.dwTrack = cTrack;
+			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
         }
