@@ -1,3 +1,19 @@
+/* PARTIALLY BASED ON THE WORK OF TONI SPETS
+ * Copyright (c) 2012 Toni Spets <toni.spets@iki.fi>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <windows.h>
 #include <mmsystem.h>
 #include <winreg.h>
@@ -110,7 +126,7 @@ BOOL FileExists(LPCTSTR szPath)
 }
  
 /* Get audio settings from <exe dir>/wgmmus.ini, set in global variables */
-void mmusi_config()
+void wgmus_config()
 {
 
 	TCHAR ConfigFileNameFullPath[MAX_PATH];
@@ -323,9 +339,9 @@ int bass_queue(const char *path)
 	return 0;
 }
 
-int mmusi_main()
+int wgmus_main()
 {
-	mmusi_config();
+	wgmus_config();
 	return 0;
 }
 
@@ -333,14 +349,14 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	if (fdwReason == DLL_PROCESS_ATTACH)
 	{
-		fh = fopen("mmusi.log", "w"); /* Renamed to .log*/
+		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
 
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
 		dprintf("	dll attached\r\n");
 		dprintf("	musdll_path = %s\r\n", musdll_path);
 
 		InitializeCriticalSection(&cs);
-		mmusi_config();
+		wgmus_config();
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)
@@ -363,7 +379,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE;
 }
 
-MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
+MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_PTR dwptrCmd, DWORD_PTR dwParam)
 {
 	if(TRUE)
 	{
@@ -522,7 +538,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 									parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
 								}
 							}
-						
+							else
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
 								parms->dwReturn = currentTrack;
@@ -814,7 +830,7 @@ MCIERROR WINAPI mmusi_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 	return MCIERR_UNRECOGNIZED_COMMAND;
 }
 
-MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
+MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
 {
 	MCIERROR err;
 	if(TRUE) 
@@ -831,43 +847,43 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		if (strstr(lpszCmd, "open cdaudio"))
 		{
 			static MCI_WAVE_OPEN_PARMS waveParms;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
 			return 0;
 		}
 		if (strstr(lpszCmd, "pause cdaudio"))
 		{
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_PAUSE, 0, (DWORD_PTR)NULL);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PAUSE, 0, (DWORD_PTR)NULL);
 			return 0;
 		}
 		if (strstr(lpszCmd, "stop cdaudio"))
 		{
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STOP, 0, (DWORD_PTR)NULL);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STOP, 0, (DWORD_PTR)NULL);
 			return 0;
 		}
 		if (strstr(lpszCmd, "close cdaudio"))
 		{
-			mmusi_mciSendCommandA(0, MCI_CLOSE, 0, (DWORD_PTR)NULL);
+			wgmus_mciSendCommandA(0, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			return 0;
 		}
 		if (strstr(lpszCmd, "set cdaudio time format milliseconds"))
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;	
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
 			return 0;
 		}
 		if (strstr(lpszCmd, "set cdaudio time format tmsf"))
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_TMSF;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
 			return 0;
 		}
 		if (strstr(lpszCmd, "status cdaudio number of tracks"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", numTracks);
 			return 0;
 		}
@@ -876,7 +892,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
 			parms.dwTrack = cTrack;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
 		}
@@ -884,7 +900,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_MODE;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_STATUS_MODE, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_STATUS_MODE, (DWORD_PTR)&parms);
 			return 0;
 		}
 		if (strstr(lpszCmd, "status cdaudio current track"))
@@ -892,7 +908,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_CURRENT_TRACK;
 			parms.dwTrack = currentTrack;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);	
 			return 0;
 		}
@@ -900,8 +916,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
-			parms.dwTrack = 1;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
         }
@@ -910,7 +925,7 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
 			parms.dwTrack = cTrack;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			return 0;
         }
@@ -920,55 +935,55 @@ MCIERROR WINAPI mmusi_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
 			parms.dwTo = to;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM|MCI_TO|MCI_NOTIFY, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM|MCI_TO|MCI_NOTIFY, (DWORD_PTR)&parms);
 			return 0;
 		}
 		if (sscanf(lpszCmd, "play cdaudio from %d", &from) == 1)
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM, (DWORD_PTR)&parms);
 			return 0;
 		}
 		if (sscanf(lpszCmd, "play cdaudio to %d", &to) == 1)
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwTo = to;
-			mmusi_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_TO, (DWORD_PTR)&parms);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_TO, (DWORD_PTR)&parms);
 			return 0;
 		}
 	}
 	return err;
 }
 
-UINT WINAPI mmusi_auxGetNumDevs()
+UINT WINAPI wgmus_auxGetNumDevs()
 {
 	return 1;
 }
 
-MMRESULT WINAPI mmusi_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpCapsa, UINT cbCaps)
+MMRESULT WINAPI wgmus_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpCapsa, UINT cbCaps)
 {
-	dprintf("mmusi_auxGetDevCapsA(uintptrDeviceID=%08X, lpCapsa=%p, cbCaps=%08X\n", uintptrDeviceID, lpCapsa, cbCaps);
+	dprintf("wgmus_auxGetDevCapsA(uintptrDeviceID=%08X, lpCapsa=%p, cbCaps=%08X\n", uintptrDeviceID, lpCapsa, cbCaps);
 
 	lpCapsa->wMid = 2 /*MM_CREATIVE*/;
 	lpCapsa->wPid = 401 /*MM_CREATIVE_AUX_CD*/;
 	lpCapsa->vDriverVersion = 1;
-	strcpy(lpCapsa->szPname, "mmusi virtual CD");
+	strcpy(lpCapsa->szPname, "wgmus virtual CD");
 	lpCapsa->wTechnology = AUXCAPS_CDAUDIO;
 	lpCapsa->dwSupport = AUXCAPS_VOLUME;
 
 	return MMSYSERR_NOERROR;
 }
 
-MMRESULT WINAPI mmusi_auxGetVolume(UINT uintDeviceID, LPDWORD lpdwVolume)
+MMRESULT WINAPI wgmus_auxGetVolume(UINT uintDeviceID, LPDWORD lpdwVolume)
 {
-	dprintf("mmusi_auxGetVolume(uintDeviceID=%08X, lpdwVolume=%p)\r\n", uintDeviceID, lpdwVolume);
+	dprintf("wgmus_auxGetVolume(uintDeviceID=%08X, lpdwVolume=%p)\r\n", uintDeviceID, lpdwVolume);
 	*lpdwVolume = 0x00000000;
 	return MMSYSERR_NOERROR;
 }
 
 
-MMRESULT WINAPI mmusi_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
+MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 {
 	static DWORD oldVolume = -1;
 	DWORD finalVolume = 0;
@@ -1003,7 +1018,7 @@ MMRESULT WINAPI mmusi_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 	oldVolume = dataBuffer;
 
 
-    dprintf("mmusi_auxSetVolume(uintDeviceId=%08X, dwVolume=%08X)\r\n", uintDeviceID, dwVolume);
+    dprintf("wgmus_auxSetVolume(uintDeviceId=%08X, dwVolume=%08X)\r\n", uintDeviceID, dwVolume);
 
     if (dwVolume == oldVolume)
     {
@@ -1022,21 +1037,21 @@ MMRESULT WINAPI mmusi_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 }
 
 
-BOOL WINAPI mmusi_PlaySoundA(LPCTSTR lpctstrSound, HMODULE hmod, DWORD dwSound)
+BOOL WINAPI wgmus_PlaySoundA(LPCTSTR lpctstrSound, HMODULE hmod, DWORD dwSound)
 {
 }
 
 
-UINT WINAPI mmusi_waveOutGetNumDevs()
+UINT WINAPI wgmus_waveOutGetNumDevs()
 {
 	return 1;
 }
 
-MMRESULT WINAPI mmusi_waveOutGetVolume(HWAVEOUT hwo, LPDWORD lpdwVolume)
+MMRESULT WINAPI wgmus_waveOutGetVolume(HWAVEOUT hwo, LPDWORD lpdwVolume)
 {
 }
 
 
-MMRESULT WINAPI mmusi_waveOutSetVolume(HWAVEOUT hwo, DWORD dwVolume)
+MMRESULT WINAPI wgmus_waveOutSetVolume(HWAVEOUT hwo, DWORD dwVolume)
 {
 }

@@ -1,5 +1,5 @@
 #include <windows.h>
-#include "mmusi.h"
+#include "wgmus.h"
 
 static HINSTANCE winmm = 0;
 

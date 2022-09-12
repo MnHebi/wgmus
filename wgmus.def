@@ -1,13 +1,13 @@
 LIBRARY winmm.dll
 
 EXPORTS
-	mciSendStringA = mmusi_mciSendStringA
-	mciSendCommandA = mmusi_mciSendCommandA
-	auxGetDevCapsA = mmusi_auxGetDevCapsA
-	auxGetNumDevs = mmusi_auxGetNumDevs
-	auxGetVolume = mmusi_auxGetVolume
-	auxSetVolume = mmusi_auxSetVolume
-	PlaySoundA = mmusi_PlaySoundA
-	waveOutGetNumDevs = mmusi_waveOutGetNumDevs
-	waveOutGetVolume = mmusi_waveOutGetVolume
-	waveOutSetVolume = mmusi_waveOutSetVolume
+	mciSendStringA = wgmus_mciSendStringA
+	mciSendCommandA = wgmus_mciSendCommandA
+	auxGetDevCapsA = wgmus_auxGetDevCapsA
+	auxGetNumDevs = wgmus_auxGetNumDevs
+	auxGetVolume = wgmus_auxGetVolume
+	auxSetVolume = wgmus_auxSetVolume
+	PlaySoundA = wgmus_PlaySoundA
+	waveOutGetNumDevs = wgmus_waveOutGetNumDevs
+	waveOutGetVolume = wgmus_waveOutGetVolume
+	waveOutSetVolume = wgmus_waveOutSetVolume
