@@ -13,7 +13,7 @@
  
  SPECIAL THANKS:
  THALDREN
- KEVIN HAKES
+ KEVIN HAKE
  ARMOURED FISH
  
  /***************************************************************************/
