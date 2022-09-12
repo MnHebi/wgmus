@@ -12,8 +12,8 @@
  SETTINGS ARE CONTROLLED VIA wgmus.ini
  
  SPECIAL THANKS:
- THALDREN
- KEVIN HAKE
+ THALDREN,
+ KEVIN HAKE,
  ARMOURED FISH
  
  /***************************************************************************/
