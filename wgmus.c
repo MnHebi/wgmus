@@ -128,7 +128,6 @@ BOOL FileExists(LPCTSTR szPath)
 /* Get audio settings from <exe dir>/wgmmus.ini, set in global variables */
 void wgmus_config()
 {
-
 	TCHAR ConfigFileNameFullPath[MAX_PATH];
 	char *last = strrchr(musdll_path, '\\');
 	if (last)
@@ -142,8 +141,8 @@ void wgmus_config()
 	*(strrchr(ConfigFileNameFullPath, '\\')+1)=0;
 	strcat(ConfigFileNameFullPath,ConfigFileName);
 	
-	if(FileExists(ConfigFileNameFullPath)) { dprintf("Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
-	else { dprintf("Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
+	if(FileExists(ConfigFileNameFullPath)) { dprintf("	Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
+	else { dprintf("	Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
 	
 	AudioLibrary = GetPrivateProfileInt("Settings", "AudioLibrary", 0, ConfigFileNameFullPath);
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
@@ -260,6 +259,9 @@ int bass_resume()
 int bass_play(const char *path)
 {
 	BASS_ChannelFree(str);
+	UINT deviceID = 0;
+	UINT hwo = 0;
+	DWORD dwVolume;
 	if (PlaybackMode == 0)
 	{
 		str = BASS_CD_StreamCreate(0, currentTrack, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
@@ -269,6 +271,7 @@ int bass_play(const char *path)
 			strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
 			strs[strc - 1] = str;
 			dprintf("	BASS_CD_StreamCreate\r\n");
+			BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 		}
 		else
 		dprintf("	BASS cannot stream the CD!\r\n");
@@ -282,6 +285,7 @@ int bass_play(const char *path)
 			strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
 			strs[strc - 1] = str;
 			dprintf("	BASS_StreamCreateFile\r\n");
+			BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 		}
 		else
 		dprintf("	BASS cannot stream the file!\r\n");
@@ -311,6 +315,7 @@ int bass_play(const char *path)
 	if (bassActivity == BASS_ACTIVE_PLAYING)
 	{
 		dprintf("	BASS playing\r\n");
+		BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	}
 	if (bassActivity == BASS_ACTIVE_PAUSED)
 	{
@@ -325,7 +330,7 @@ int bass_play(const char *path)
 	if (bassActivity == BASS_ACTIVE_STALLED)
 	{
 		dprintf("	BASS playback was stalled\r\n");
-		BASS_StreamPutFileData(str, tracks[nextTrack].path, BASS_FILEDATA_END);
+		/*BASS_StreamPutFileData(str, tracks[nextTrack].path, BASS_FILEDATA_END);*/
 	}
 
 
@@ -402,6 +407,42 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							/*BASS_SetDevice(MAGIC_DEVICEID);*/
 							playeractive = 1;
 							dprintf("	BASS_Init\r\n");
+							dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
+							str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
+							
+							DWORD dataBuffer;
+							DWORD bufferSize = sizeof(dataBuffer);
+							DWORD dwVolume;
+							DWORD finalVolume = 0;
+							HKEY hkey;
+							if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\TotalM\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
+							{
+								printf("failed to open key");
+								return 1;
+							}
+
+							LRESULT status = RegQueryValueEx(
+							hkey,
+							TEXT("musicvol"),
+							NULL,
+							NULL,
+							(LPBYTE)&dataBuffer,
+							&bufferSize);
+
+							if (RegCloseKey(hkey) != ERROR_SUCCESS) 
+							{
+								printf("failed to close key");
+								return 1;
+							}
+
+							dprintf("	musicvol regkey status: %d\r\n", status);
+							dprintf("	musicvol regkey value: %d\r\n", dataBuffer);
+							dprintf("	musicvol regkey size: %d\r\n", bufferSize);
+							dwVolume = dataBuffer;
+							finalVolume = dwVolume * 156.25;
+							dprintf("	BASS initial stream volume set at: %d\r\n", finalVolume);
+							BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, finalVolume);
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 						else
 						if (playeractive == 1)
@@ -428,6 +469,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					{
 						BASS_ChannelPause(str);
 						dprintf("	BASS_ChannelPause\r\n");
+						BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 					}
 				}
 				return 0;
@@ -445,6 +487,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						if (AudioLibrary == 5)
 						{
 							BASS_ChannelStop(str);
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 							dprintf("	BASS_ChannelStop\r\n");
 						}
 						currentTrack = 1; /* Reset current track */
@@ -560,24 +603,40 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
+							if (AudioLibrary == 5)
+							{
+								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+							}
 						}
 						else
 						if(paused)
 						{
 							dprintf("        we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
+							if (AudioLibrary == 5)
+							{
+								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+							}
 						}
 						else
 						if(stopped)
 						{
 							dprintf("        we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
+							if (AudioLibrary == 5)
+							{
+								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+							}
 						}
 						else
 						if(playing)
 						{
 							dprintf("        we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
+							if (AudioLibrary == 5)
+							{
+								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+							}
 						}
 					}
 					return 0;
@@ -963,7 +1022,7 @@ UINT WINAPI wgmus_auxGetNumDevs()
 
 MMRESULT WINAPI wgmus_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpCapsa, UINT cbCaps)
 {
-	dprintf("wgmus_auxGetDevCapsA(uintptrDeviceID=%08X, lpCapsa=%p, cbCaps=%08X\n", uintptrDeviceID, lpCapsa, cbCaps);
+	dprintf("	wgmus_auxGetDevCapsA(uintptrDeviceID=%08X, lpCapsa=%p, cbCaps=%08X\n", uintptrDeviceID, lpCapsa, cbCaps);
 
 	lpCapsa->wMid = 2 /*MM_CREATIVE*/;
 	lpCapsa->wPid = 401 /*MM_CREATIVE_AUX_CD*/;
@@ -977,8 +1036,7 @@ MMRESULT WINAPI wgmus_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpCaps
 
 MMRESULT WINAPI wgmus_auxGetVolume(UINT uintDeviceID, LPDWORD lpdwVolume)
 {
-	dprintf("wgmus_auxGetVolume(uintDeviceID=%08X, lpdwVolume=%p)\r\n", uintDeviceID, lpdwVolume);
-	*lpdwVolume = 0x00000000;
+	dprintf("	wgmus_auxGetVolume(uintDeviceID=%08X, lpdwVolume=%p)\r\n", uintDeviceID, lpdwVolume);
 	return MMSYSERR_NOERROR;
 }
 
@@ -986,49 +1044,40 @@ MMRESULT WINAPI wgmus_auxGetVolume(UINT uintDeviceID, LPDWORD lpdwVolume)
 MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 {
 	static DWORD oldVolume = -1;
-	DWORD finalVolume = 0;
+	DWORD finalVolume;
+	WORD left;
+	WORD right;
 	
+	if (dwVolume > 0)
+	{
+		left = dwVolume & 0xffff;
+		dprintf("	Set Left Speaker value at: %d\r\n", left);
+		right = (dwVolume >> 16) & 0xffff;
+		dprintf("	Set Right Speaker value at: %d\r\n", right);
+	}
+	else
+	if (dwVolume <= 0)
+	{
+		left = 0 & 0xffff;
+		dprintf("	Set Left Speaker value at: %d\r\n", left);
+		right = (0 >> 16) & 0xffff;
+		dprintf("	Set Right Speaker value at: %d\r\n", right);
+	}		
+	
+	LPARAM vParam = MAKELPARAM(left, right);
+	dwVolume = vParam;
 
-    DWORD dataBuffer;
-    DWORD bufferSize = sizeof(dataBuffer);
-
-    HKEY hkey;
-
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\TotalM\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) {
-        printf("failed to open key");
-        return 1;
-    }
-
-    LRESULT status = RegQueryValueEx(
-            hkey,
-            TEXT("musicvol"),
-            NULL,
-            NULL,
-            (LPBYTE)&dataBuffer,
-            &bufferSize);
-
-    if (RegCloseKey(hkey) != ERROR_SUCCESS) {
-        printf("failed to close key");
-        return 1;
-    }
-
-    dprintf("musicvol regkey status: %d\n", status);
-    dprintf("musicvol regkey value: %d\n", dataBuffer);
-    dprintf("musicvol regkey size: %d\n", bufferSize);
-	oldVolume = dataBuffer;
-
-
-    dprintf("wgmus_auxSetVolume(uintDeviceId=%08X, dwVolume=%08X)\r\n", uintDeviceID, dwVolume);
+    dprintf("	wgmus_auxSetVolume(uintDeviceId=%08X, dwVolume=%08X)\r\n", uintDeviceID, dwVolume);
 
     if (dwVolume == oldVolume)
     {
         return MMSYSERR_NOERROR;
     }
 	
-	finalVolume = dwVolume * 1000;
-	
 	if (AudioLibrary == 5)
 	{
+		finalVolume = left / 6.5535;
+		dprintf("	BASS stream volume set at: %d\r\n", finalVolume);
 		BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, finalVolume);
 	}
 
@@ -1039,6 +1088,8 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 
 BOOL WINAPI wgmus_PlaySoundA(LPCTSTR lpctstrSound, HMODULE hmod, DWORD dwSound)
 {
+	dprintf("	wgmus_PlaySoundA(lpctstrSound=%s, hmod=%p, dwSound=%08X)\r\n", lpctstrSound, hmod, dwSound);
+	return 0;
 }
 
 
@@ -1049,9 +1100,14 @@ UINT WINAPI wgmus_waveOutGetNumDevs()
 
 MMRESULT WINAPI wgmus_waveOutGetVolume(HWAVEOUT hwo, LPDWORD lpdwVolume)
 {
+	dprintf("	wgmus_waveOutGetVolume(hwo=%08X, lpdwVolume=%p)\r\n", hwo, lpdwVolume);
+	*lpdwVolume = 0x00000000;
+	return MMSYSERR_NOERROR;
 }
 
 
 MMRESULT WINAPI wgmus_waveOutSetVolume(HWAVEOUT hwo, DWORD dwVolume)
 {
+	dprintf("	wgmus_waveOutSetVolume(hwo=%08X, dwVolume=%08X)\r\n", hwo, dwVolume);
+	return MMSYSERR_NOERROR;
 }
