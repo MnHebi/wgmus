@@ -3,6 +3,7 @@
  WGMUS.DLL (WARGAME MUSIC DLL) IS DESIGNED FOR USE WITH TOTAL ANNIHILATION
  TO ENABLE MUSIC PLAYBACK FROM FILES ON HARD DRIVE, OR FROM CD
  AS OF NOW, PLAYBACK IS SUPPORTED VIA BASS ( https://www.un4seen.com/ )
+ AND ADDON BASS CD
  PLANS FOR SUPPORTING AUDIERE, OPENAL, WINMM, AND DIRECTSHOW.
  PARTIALLY BASED ON OGG-WINMM https://github.com/hifi-unmaintained/ogg-winmm
  
@@ -24,5 +25,13 @@
  THALDREN,
  KEVIN HAKE,
  ARMOURED FISH
+ 
+ COPYRIGHT MENTIONS:
+ ogg-winmm
+ Copyright (c) 2012 Toni Spets <toni.spets@iki.fi>
+ BASS 2.4
+ Copyright (c) 1999-2021 Un4seen Developments Ltd. All rights reserved.	
+ BASSCD 2.4
+ Copyright (c) 2003-2022 Un4seen Developments Ltd. All rights reserved.
  
  /***************************************************************************/
