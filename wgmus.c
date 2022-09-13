@@ -260,8 +260,7 @@ int bass_play(const char *path)
 {
 	BASS_ChannelFree(str);
 	UINT deviceID = 0;
-	UINT hwo = 0;
-	DWORD dwVolume;
+	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	if (PlaybackMode == 0)
 	{
 		str = BASS_CD_StreamCreate(0, currentTrack, BASS_SAMPLE_LOOP | BASS_STREAM_PRESCAN);
@@ -448,6 +447,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						if (playeractive == 1)
 						{
 							dprintf("	BASS already initialized, doing nothing\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 					}
 				}
@@ -487,8 +487,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						if (AudioLibrary == 5)
 						{
 							BASS_ChannelStop(str);
-							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 							dprintf("	BASS_ChannelStop\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 						currentTrack = 1; /* Reset current track */
 						if (numTracks > 1)
@@ -603,40 +603,24 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
-							if (AudioLibrary == 5)
-							{
-								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-							}
 						}
 						else
 						if(paused)
 						{
 							dprintf("        we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
-							if (AudioLibrary == 5)
-							{
-								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-							}
 						}
 						else
 						if(stopped)
 						{
 							dprintf("        we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
-							if (AudioLibrary == 5)
-							{
-								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-							}
 						}
 						else
 						if(playing)
 						{
 							dprintf("        we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
-							if (AudioLibrary == 5)
-							{
-								BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-							}
 						}
 					}
 					return 0;
@@ -775,6 +759,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							BASS_Start();
 							dprintf("	BASS_Start from paused\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 					}
 					if(playing == 0)
@@ -796,6 +781,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 									notify = 1;
 									BASS_ChannelPlay(str, FALSE);
 									dwptrCmd = 0;
+									BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 								}
 							}							
 						}
@@ -811,6 +797,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							BASS_Start();
 							dprintf("	BASS_Start from stopped\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 					}
 				}
@@ -823,6 +810,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							BASS_Start();
 							dprintf("	BASS_Start from paused due to unknown interference\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
 					}
 					if (stopped == 1)
@@ -831,6 +819,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							BASS_Start();
 							dprintf("	BASS_Start from stopped due to unknown interference\r\n");
+							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}	
 					}						
 				}
@@ -1062,7 +1051,15 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 		dprintf("	Set Left Speaker value at: %d\r\n", left);
 		right = (0 >> 16) & 0xffff;
 		dprintf("	Set Right Speaker value at: %d\r\n", right);
-	}		
+	}
+
+	if (AudioLibrary == 5)
+	{
+		finalVolume = left / 6.554;
+		dprintf("	BASS stream volume set at: %d\r\n", finalVolume);
+		BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, finalVolume);
+		BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+	}	
 	
 	LPARAM vParam = MAKELPARAM(left, right);
 	dwVolume = vParam;
@@ -1073,14 +1070,6 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
     {
         return MMSYSERR_NOERROR;
     }
-	
-	if (AudioLibrary == 5)
-	{
-		finalVolume = left / 6.5535;
-		dprintf("	BASS stream volume set at: %d\r\n", finalVolume);
-		BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, finalVolume);
-	}
-
 
     return MMSYSERR_NOERROR;
 }
