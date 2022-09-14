@@ -490,13 +490,6 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							dprintf("	BASS_ChannelStop\r\n");
 							BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						}
-						currentTrack = 1; /* Reset current track */
-						if (numTracks > 1)
-						{
-							nextTrack = 2; /* Reset next track */
-						}
-						else
-						nextTrack = 1; /* Reset next track */
 					}
 				}
 				return 0;
@@ -533,25 +526,31 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
 						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
-						if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
+						if((parms->dwTrack > 0) &&  (parms->dwTrack <= MAX_TRACKS))
 						{
 							if (AudioLibrary == 5)
 							{
+								parms->dwTrack -= 1;
 								DWORD bassCdTrackLength = BASS_CD_GetTrackLength(0, parms->dwTrack);
-								if (bassCdTrackLength >= 0)
+								if (bassCdTrackLength > 0)
 								{
 									parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+									dprintf("      MCI_CDA_TRACK_AUDIO\r\n");
 								}
 								else
-								parms->dwReturn = MCI_CDA_TRACK_OTHER;
+								if (bassCdTrackLength < 0)
+								{
+									parms->dwReturn = MCI_CDA_TRACK_OTHER;
+									dprintf("      MCI_CDA_TRACK_OTHER\r\n");
+								}
 							}
 						}
 					}
 					else
 					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
 					{
+						parms->dwReturn = currentTrack + 1;
 						dprintf("	Sending current track: %d\r\n", currentTrack);
-						parms->dwReturn = currentTrack;
 					}
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
@@ -570,26 +569,29 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
 							if (dwptrCmd & MCI_TRACK)
 							{
+								parms->dwTrack -= 1;
 								queriedCdTrack = parms->dwTrack;
 								if(timeFormat == MCI_FORMAT_MILLISECONDS)
 								{
+									queriedCdTrack += 1;
 									parms->dwReturn = queriedCdTrack;
 								}
 								else
 								if(timeFormat == MCI_FORMAT_TMSF)
 								{
+									queriedCdTrack += 1;
 									parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
 								}
 							}
 							else
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
-								parms->dwReturn = currentTrack;
+								parms->dwReturn = currentTrack + 1;
 							}
 							else
 							if(timeFormat == MCI_FORMAT_TMSF)
 							{
-								snprintf(trackNumber, 3, "%02d", currentTrack);
+								snprintf(trackNumber, 3, "%02d", currentTrack + 1);
 								snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
 								snprintf(trackSeconds, 3, "%02d", bassMinutes);
 								parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
@@ -637,7 +639,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
 						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
-						if((parms->dwTrack > 0) &&  (parms->dwTrack , MAX_TRACKS))
+						if((parms->dwTrack > 0) &&  (parms->dwTrack < MAX_TRACKS))
 						{
 							parms->dwReturn = MCI_CDA_TRACK_AUDIO;
 						}
@@ -828,10 +830,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (dwptrCmd & MCI_FROM && !(dwptrCmd & MCI_TO))
 					{
 						dprintf("  MCI_FROM\r\n");
+						if (PlaybackMode == 0)
+						{
+							parms->dwFrom -= 1;
+						}
 						currentTrack = (int)(parms->dwFrom);
 						dprintf("	From value: %d\r\n", parms->dwFrom);
 						dprintf("	Current track int value is: %d\r\n", currentTrack);
-						dprintf("	Current track is: %s\r\n", tracks[currentTrack].path);
 						if (AudioLibrary == 5)
 						{
 							playing = 1;
@@ -858,8 +863,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("  MCI_FROM\r\n");
 						dprintf("  MCI_TO\r\n");
 						dprintf("  MCI_NOTIFY\r\n");
+						if (PlaybackMode == 0)
+						{
+							parms->dwFrom -= 1;
+						}
 						currentTrack = (int)(parms->dwFrom);
 						nextTrack = (int)(parms->dwTo);
+						dprintf("	From value: %d\r\n", parms->dwFrom);
+						dprintf("	Current track int value is: %d\r\n", currentTrack);
 						if (AudioLibrary == 5)
 						{
 							playing = 1;
