@@ -638,10 +638,10 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
-						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
-						if((parms->dwTrack > 0) &&  (parms->dwTrack < MAX_TRACKS))
+						dprintf("      MCI_CDA_STATUS_TYPE_TRACK MCI_CDA_TRACK_OTHER\r\n");
+						if((parms->dwTrack == 1) &&  (parms->dwTrack < MAX_TRACKS))
 						{
-							parms->dwReturn = MCI_CDA_TRACK_AUDIO;
+							parms->dwReturn = MCI_CDA_TRACK_OTHER;
 						}
 					}
 					else
@@ -659,14 +659,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						if (AudioLibrary == 5)
 						{
 							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
-							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
-							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 							int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 							int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
 							int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
 							if (dwptrCmd & MCI_TRACK)
 							{
+								dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+								dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 								queriedTrack = (int)(parms->dwTrack);
 								if(timeFormat == MCI_FORMAT_MILLISECONDS)
 								{
@@ -678,7 +678,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 									parms->dwReturn = MCI_MAKE_TMSF(queriedTrack, 0, 0, 0);
 								}
 							}
-						
+							else
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
 								parms->dwReturn = currentTrack;
