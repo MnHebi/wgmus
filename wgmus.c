@@ -107,6 +107,7 @@ int playing = 0;
 int playeractive = 0;
 int timeFormat = MCI_FORMAT_MILLISECONDS;
 int timesPlayed = 0;
+int changeNotify = 0;
 
 /* AUDIO PLAYBACK DEFINES END */
 
@@ -271,6 +272,21 @@ int bass_play(const char *path)
 			strs[strc - 1] = str;
 			dprintf("	BASS_CD_StreamCreate\r\n");
 			BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+			timesPlayed ++;
+			if (changeNotify == 1)
+			{
+				if (notify == 0)
+				{
+					notify = 1;
+					changeNotify = 0;
+				}
+				else
+				if (notify == 1)
+				{
+					notify = 0;
+					changeNotify = 0;
+				}
+			}
 		}
 		else
 		dprintf("	BASS cannot stream the CD!\r\n");
@@ -285,6 +301,21 @@ int bass_play(const char *path)
 			strs[strc - 1] = str;
 			dprintf("	BASS_StreamCreateFile\r\n");
 			BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+			timesPlayed++;
+			if (changeNotify == 1)
+			{
+				if (notify == 0)
+				{
+					notify = 1;
+					changeNotify = 0;
+				}
+				else
+				if (notify == 1)
+				{
+					notify = 0;
+					changeNotify = 0;
+				}
+			}
 		}
 		else
 		dprintf("	BASS cannot stream the file!\r\n");
@@ -482,6 +513,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (AudioLibrary == 5)
 					{
 						BASS_ChannelStop(str);
+						timesPlayed = 0;
 						dprintf("	BASS_ChannelStop\r\n");
 						BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 						uintMsg = 0;
@@ -867,20 +899,17 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							if (timesPlayed > 0)
 							{
-								if (notify == 1)
-								{
-									notify = 0;
-									BASS_ChannelStop(str);
-									BASS_StreamFree(str);
-									BASS_ChannelPlay(str, TRUE);
-									bass_play(tracks[currentTrack].path);
-									dprintf("	BASS finished playback\r\n");
-									Sleep(5);
-									notify = 1;
-									dwptrCmd = 0;
-									uintMsg = 0;
-									SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-								}
+								changeNotify = 1;
+								BASS_ChannelPause(str);
+								BASS_ChannelStop(str);
+								BASS_StreamFree(str);
+								BASS_ChannelPlay(str, TRUE);
+								bass_play(tracks[currentTrack].path);
+								dprintf("	BASS finished playback\r\n");
+								dwptrCmd = 0;
+								uintMsg = 0;
+								timesPlayed = 1;
+								SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 							}
 							if (timesPlayed == 0)
 							{
@@ -891,10 +920,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								paused = 0;
 								closed = 0;
 								notify = 1;
-								bass_play(tracks[currentTrack].path);
 								dwptrCmd = 0;
 								uintMsg = 0;
-								timesPlayed++;
+								bass_play(tracks[currentTrack].path);
 							}
 						}
 					}
@@ -914,20 +942,17 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							if (timesPlayed > 0)
 							{
-								if (notify == 1)
-								{
-									notify = 0;
-									BASS_ChannelStop(str);
-									BASS_StreamFree(str);
-									BASS_ChannelPlay(str, TRUE);
-									bass_play(tracks[currentTrack].path);
-									dprintf("	BASS finished playback\r\n");
-									Sleep(5);
-									notify = 1;
-									dwptrCmd = 0;
-									uintMsg = 0;
-									SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-								}
+								changeNotify = 1;
+								BASS_ChannelPause(str);
+								BASS_ChannelStop(str);
+								BASS_StreamFree(str);
+								BASS_ChannelPlay(str, TRUE);
+								bass_play(tracks[currentTrack].path);
+								dprintf("	BASS finished playback\r\n");
+								dwptrCmd = 0;
+								uintMsg = 0;
+								timesPlayed = 1;
+								SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 							}
 							if (timesPlayed == 0)
 							{
@@ -938,10 +963,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								paused = 0;
 								closed = 0;
 								notify = 1;
-								bass_play(tracks[currentTrack].path);
 								dwptrCmd = 0;
 								uintMsg = 0;
-								timesPlayed++;
+								bass_play(tracks[currentTrack].path);
 							}
 						}
 					}
@@ -963,20 +987,17 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							if (timesPlayed > 0)
 							{
-								if (notify == 1)
-								{
-									notify = 0;
-									BASS_ChannelStop(str);
-									BASS_StreamFree(str);
-									BASS_ChannelPlay(str, TRUE);
-									bass_play(tracks[currentTrack].path);
-									dprintf("	BASS finished playback\r\n");
-									Sleep(5);
-									notify = 1;
-									dwptrCmd = 0;
-									uintMsg = 0;
-									SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-								}
+								changeNotify = 1;
+								BASS_ChannelPause(str);
+								BASS_ChannelStop(str);
+								BASS_StreamFree(str);
+								BASS_ChannelPlay(str, TRUE);
+								bass_play(tracks[currentTrack].path);
+								dprintf("	BASS finished playback\r\n");
+								dwptrCmd = 0;
+								uintMsg = 0;
+								timesPlayed = 1;
+								SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 							}
 							if (timesPlayed == 0)
 							{
@@ -987,10 +1008,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								paused = 0;
 								closed = 0;
 								notify = 1;
-								bass_play(tracks[currentTrack].path);
 								dwptrCmd = 0;
 								uintMsg = 0;
-								timesPlayed++;
+								bass_play(tracks[currentTrack].path);
 							}
 						}
 					}
