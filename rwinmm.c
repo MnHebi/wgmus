@@ -1,6 +1,10 @@
 #include <windows.h>
 #include "wgmus.h" 
 
+extern FARPROC wgmus_PlaySoundA
+extern FARPROC wgmus_waveOutGetVolume
+extern FARPROC wgmus_waveOutSetVolume 
+
 static HINSTANCE winmm = 0;
 
 HINSTANCE getWinmmHandle()
