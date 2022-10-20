@@ -1,5 +1,5 @@
 #include <windows.h>
-#include "wgmus.h"
+#include "wgmus.h" 
 
 static HINSTANCE winmm = 0;
 
@@ -29,7 +29,10 @@ HINSTANCE loadRealDLL()
     strncat(winmm_path, "\\winmm.DLL", 11); /* fixed gcc overflow warning */
 
     winmm = LoadLibrary(winmm_path);
-    
+	wgmus_PlaySoundA = GetProcAddress(winmm, "PlaySoundA");
+	wgmus_waveOutGetVolume = (MMRESULT (*)(UINT)) GetProcAddress(winmm, "waveOutGetVolume");
+	wgmus_waveOutSetVolume = (MMRESULT (*)(UINT)) GetProcAddress(winmm, "waveOutSetVolume");
+	
     /* start watcher thread to close the library */
     CreateThread(NULL, 500, (LPTHREAD_START_ROUTINE)ExitMonitor, GetCurrentThread(), 0, NULL);
 
