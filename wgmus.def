@@ -7,7 +7,7 @@ EXPORTS
 	auxGetNumDevs = wgmus_auxGetNumDevs
 	auxGetVolume = wgmus_auxGetVolume
 	auxSetVolume = wgmus_auxSetVolume
-	PlaySoundA = wgmus_PlaySoundA
+	PlaySoundA = winmm.PlaySoundA
 	waveOutGetNumDevs = wgmus_waveOutGetNumDevs
-	waveOutGetVolume = wgmus_waveOutGetVolume
-	waveOutSetVolume = wgmus_waveOutSetVolume
+	waveOutGetVolume = winmm.waveOutGetVolume
+	waveOutSetVolume = winmm.waveOutSetVolume

@@ -3,9 +3,6 @@
 #include <stdint.h>
 #include "wgmus.h"
 
-FARPROC wgmus_PlaySoundA;
-FARPROC wgmus_waveOutGetVolume;
-FARPROC wgmus_waveOutSetVolume;
 static HINSTANCE winmm = 0;
 
 HINSTANCE getWinmmHandle()
@@ -34,9 +31,6 @@ HINSTANCE loadRealDLL()
     strncat(winmm_path, "\\winmm.DLL", 11); /* fixed gcc overflow warning */
 
     winmm = LoadLibrary(winmm_path);
-	wgmus_PlaySoundA = GetProcAddress(winmm, "PlaySoundA");
-	wgmus_waveOutGetVolume = GetProcAddress(winmm, "waveOutGetVolume");
-	wgmus_waveOutSetVolume = GetProcAddress(winmm, "waveOutSetVolume");
 	
     /* start watcher thread to close the library */
     CreateThread(NULL, 500, (LPTHREAD_START_ROUTINE)ExitMonitor, GetCurrentThread(), 0, NULL);
