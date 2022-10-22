@@ -358,7 +358,7 @@ int bass_forceplay(const char *path)
 	
 	if (PlaybackMode == 0)
 	{
-		str = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_AUTOFREE	 | BASS_STREAM_PRESCAN);
+		str = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
 		if (str) 
 		{
 			strc++;
@@ -403,7 +403,7 @@ int bass_forceplay(const char *path)
 	}
 	if (PlaybackMode == 1)
 	{
-		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE	| BASS_STREAM_PRESCAN);
+		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
 		if (str) 
 		{
 			strc++;
@@ -492,7 +492,7 @@ int bass_play(const char *path)
 	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	if (PlaybackMode == 0)
 	{
-		str = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_AUTOFREE	 | BASS_STREAM_PRESCAN);
+		str = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
 		if (str) 
 		{
 			strc++;
@@ -537,7 +537,7 @@ int bass_play(const char *path)
 	}
 	if (PlaybackMode == 1)
 	{
-		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE	| BASS_STREAM_PRESCAN);
+		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
 		if (str) 
 		{
 			strc++;
@@ -1490,56 +1490,7 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
     return MMSYSERR_NOERROR;
 }
 
-
-BOOL WINAPI wgmus_PlaySoundA(LPCTSTR lpctstrSound, HMODULE hmod, DWORD dwSound)
-{
-	dprintf("	wgmus_PlaySoundA(lpctstrSound=%s, hmod=%p, dwSound=%08X)\r\n", lpctstrSound, hmod, dwSound);
-	return 0;
-}
-
-
 UINT WINAPI wgmus_waveOutGetNumDevs()
 {
 	return 1;
-}
-
-MMRESULT WINAPI wgmus_waveOutGetVolume(HWAVEOUT hwo, LPDWORD lpdwVolume)
-{
-	dprintf("	wgmus_waveOutGetVolume(hwo=%08X, lpdwVolume=%p)\r\n", hwo, lpdwVolume);
-	*lpdwVolume = 0x00000000;
-	return MMSYSERR_NOERROR;
-}
-
-MMRESULT WINAPI wgmus_waveOutSetVolume(HWAVEOUT hwo, DWORD dwVolume)
-{
-	static DWORD oldVolume = -1;
-	WORD left;
-	WORD right;
-	
-	if (dwVolume > 0)
-	{
-		left = dwVolume & 0xffff;
-		dprintf("	Set Left Speaker Waveout value at: %d\r\n", left);
-		right = (dwVolume >> 16) & 0xffff;
-		dprintf("	Set Right Speaker Waveout value at: %d\r\n", right);
-	}
-	else
-	if (dwVolume <= 0)
-	{
-		left = 0 & 0xffff;
-		dprintf("	Set Left Speaker Waveout value at: %d\r\n", left);
-		right = (0 >> 16) & 0xffff;
-		dprintf("	Set Right Speaker Waveout value at: %d\r\n", right);
-	}
-
-	LPARAM vParam = MAKELPARAM(left, right);
-	dwVolume = vParam;
-	dprintf("	wgmus_waveOutSetVolume(hwo=%08X, dwVolume=%08X)\r\n", hwo, dwVolume);
-
-    if (dwVolume == oldVolume)
-    {
-        return MMSYSERR_NOERROR;
-    }
-
-	return MMSYSERR_NOERROR;
 }
