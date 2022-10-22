@@ -1,10 +1,11 @@
 #include <windows.h>
-#include "wgmus.h" 
+#include <mmsystem.h>
+#include <stdint.h>
+#include "wgmus.h"
 
-extern FARPROC wgmus_PlaySoundA
-extern FARPROC wgmus_waveOutGetVolume
-extern FARPROC wgmus_waveOutSetVolume 
-
+FARPROC wgmus_PlaySoundA;
+FARPROC wgmus_waveOutGetVolume;
+FARPROC wgmus_waveOutSetVolume;
 static HINSTANCE winmm = 0;
 
 HINSTANCE getWinmmHandle()
@@ -34,8 +35,8 @@ HINSTANCE loadRealDLL()
 
     winmm = LoadLibrary(winmm_path);
 	wgmus_PlaySoundA = GetProcAddress(winmm, "PlaySoundA");
-	wgmus_waveOutGetVolume = (MMRESULT (*)(UINT)) GetProcAddress(winmm, "waveOutGetVolume");
-	wgmus_waveOutSetVolume = (MMRESULT (*)(UINT)) GetProcAddress(winmm, "waveOutSetVolume");
+	wgmus_waveOutGetVolume = GetProcAddress(winmm, "waveOutGetVolume");
+	wgmus_waveOutSetVolume = GetProcAddress(winmm, "waveOutSetVolume");
 	
     /* start watcher thread to close the library */
     CreateThread(NULL, 500, (LPTHREAD_START_ROUTINE)ExitMonitor, GetCurrentThread(), 0, NULL);
