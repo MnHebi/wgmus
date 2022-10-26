@@ -253,18 +253,43 @@ int bass_init()
 	dprintf("	Audio library for commands is: BASS\r\n");	
 	if(WindowsEleven == 0)
 	{
+		str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
 		BASS_Init(1, 44100, 0, win, NULL);
 	}
 	else
 	if(WindowsEleven == 1)
 	{
-		 BASS_WASAPI_Init(1, 44100, 0, BASS_WASAPI_CATEGORY_GAMEMEDIA, 0.1, 0, WASAPIPROC_BASS, (void*)str);
+		BASS_Init(0, 44100, 0, 0, NULL);		
+		str = BASS_StreamCreate(44100, 2, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT, STREAMPROC_DEVICE, 0);
+		if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_EXCLUSIVE, 0.1, 0, WASAPIPROC_BASS, (void*)str))
+		{
+			//exclusive failed, try shared
+			if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA, 0.1, 0, WASAPIPROC_BASS, (void*)str))
+			{
+				dprintf("	Initialization FAILED\r\n");
+			}
+		}
 	}
 	playeractive = 1;
 	dprintf("	BASS_Init\r\n");
-	dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
-	str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
+	if(WindowsEleven == 0)
+	{
+		dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
+	}
+	else
+	if(WindowsEleven == 1)
+	{
+		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+	}
 	
+	int bassError = BASS_ErrorGetCode();
+	
+	if (bassError == 0)
+	{
+		
+	}
+	else
+	dprintf("	BASS Error: %d\r\n", bassError);
 	
 	DWORD dataBuffer;
 	DWORD bufferSize = sizeof(dataBuffer);
@@ -362,12 +387,28 @@ int bass_forceplay(const char *path)
 	BASS_ChannelStop(str);
 	dprintf("	BASS_ChannelStop\r\n");
 	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-		
-	BASS_Init(1, 44100, 0, win, NULL);
+	if(WindowsEleven == 0)
+	{
+		str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
+		BASS_Init(1, 44100, 0, win, NULL);
+	}
+	else
+	if(WindowsEleven == 1)
+	{
+		str = BASS_StreamCreate(44100, 2, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT, STREAMPROC_DEVICE, 0);
+		if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_EXCLUSIVE, 0.1, 0, WASAPIPROC_BASS, (void*)str))
+		{
+			//exclusive failed, try shared
+			if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA, 0.1, 0, WASAPIPROC_BASS, (void*)str))
+			{
+				dprintf("	Initialization FAILED\r\n");
+				return 0;
+			}
+		}
+	}
 	playeractive = 1;
 	dprintf("	BASS_Init\r\n");
 	dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
-	str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
 	
 	if (PlaybackMode == 0)
 	{
@@ -416,7 +457,19 @@ int bass_forceplay(const char *path)
 	}
 	if (PlaybackMode == 1)
 	{
-		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
+		if(WindowsEleven == 0)
+		{
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
+		}
+		else
+		if(WindowsEleven == 1)
+		{
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP | BASS_STREAM_DECODE | 
+BASS_SAMPLE_FLOAT);
+			float fft[2048];
+			BASS_ChannelGetData(str, fft, BASS_DATA_FFT2048);
+			BASS_WASAPI_Start();
+		}
 		if (str) 
 		{
 			strc++;
@@ -550,7 +603,17 @@ int bass_play(const char *path)
 	}
 	if (PlaybackMode == 1)
 	{
-		str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
+		if(WindowsEleven == 0)
+		{
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
+		}
+		else
+		if(WindowsEleven == 1)
+		{
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP | BASS_STREAM_DECODE);
+			float fft[2048];
+			BASS_ChannelGetData(str, fft, BASS_DATA_FFT2048);
+		}
 		if (str) 
 		{
 			strc++;
@@ -653,7 +716,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		}
 		if (AudioLibrary == 5)
 		{
-			BASS_Free();
+			if (WindowsEleven == 0)
+			{
+				BASS_Free();
+			}
+			else
+			if (WindowsEleven == 1)
+			{
+				BASS_WASAPI_Free();
+			}
 		}
         if (fh)
         {
