@@ -28,6 +28,7 @@
 
 #include <bass/bass.h>
 #include <bass/basscd.h>
+#include <bass/basswasapi.h>
 
 /* AUDIO LIBRARY INCLUDES END */
 
@@ -50,6 +51,7 @@ char musdll_path[2048];
 int AudioLibrary;
 int FileFormat;
 int PlaybackMode;
+int WindowsEleven;
 char MusicFolder[255];
 char strFileFormat[5];
 TCHAR MusicFolderFullPath[MAX_PATH];
@@ -150,10 +152,12 @@ void wgmus_config()
 	AudioLibrary = GetPrivateProfileInt("Settings", "AudioLibrary", 0, ConfigFileNameFullPath);
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
 	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
+	WindowsEleven = GetPrivateProfileInt("Settings", "WindowsEleven", 0, ConfigFileNameFullPath);
 	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
 	dprintf("	AudioLibrary = %d\r\n", AudioLibrary);
 	dprintf("	FileFormat = %d\r\n", FileFormat);
 	dprintf("	PlaybackMode = %d\r\n", PlaybackMode);
+	dprintf("	WindowsEleven = %d\r\n", WindowsEleven);
 	dprintf("	MusicFolder = %s\r\n", MusicFolder);
 	
 	if(FileFormat == 0)
@@ -247,11 +251,20 @@ void wgmus_config()
 int bass_init()
 {
 	dprintf("	Audio library for commands is: BASS\r\n");	
-	BASS_Init(1, 44100, 0, win, NULL);
+	if(WindowsEleven == 0)
+	{
+		BASS_Init(1, 44100, 0, win, NULL);
+	}
+	else
+	if(WindowsEleven == 1)
+	{
+		 BASS_WASAPI_Init(1, 44100, 0, BASS_WASAPI_CATEGORY_GAMEMEDIA, 0.1, 0, WASAPIPROC_BASS, (void*)str);
+	}
 	playeractive = 1;
 	dprintf("	BASS_Init\r\n");
 	dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
 	str = BASS_StreamCreate(44100, 2, 0, STREAMPROC_DEVICE, 0);
+	
 	
 	DWORD dataBuffer;
 	DWORD bufferSize = sizeof(dataBuffer);
