@@ -97,6 +97,7 @@ int samc;
 
 HSTREAM str;
 BASS_CHANNELINFO cinfo;
+int PlaybackFinished;
 
 /* BASS PLAYER DEFINES END */
 
@@ -251,8 +252,17 @@ void wgmus_config()
 DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
 	DWORD c = BASS_ChannelGetData(str, buffer, length);
-	if (c == -1) c = 0; // an error, no data
-	return c;
+    if (c<0) { // at the end
+        if (!BASS_WASAPI_GetData(NULL, BASS_DATA_AVAILABLE)) // check no buffered data remaining
+			BASS_WASAPI_Stop(TRUE);
+			notify = 0;
+			changeNotify = 0;
+			dprintf("	BASS finished playback\r\n");
+			playing = 0;
+			SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
+        return 0;
+    }
+    return c;
 }
 
 int bass_init()
@@ -267,7 +277,7 @@ int bass_init()
 	if(WindowsEleven == 1)
 	{
 		BASS_Init(1, 44100, 0, win, NULL);		
-		if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_AUTOFORMAT	, 0.1, 0, WasapiProc, NULL))
+		if (!BASS_WASAPI_Init(-1, 44100, 2, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_AUTOFORMAT	, 0.1, 0, WasapiProc, NULL))
 		{
 			dprintf("	Initialization FAILED\r\n");
 		}
@@ -331,28 +341,54 @@ int bass_init()
 
 int bass_pause()
 {
-	BASS_ChannelPause(str);
-	dprintf("	BASS_ChannelPause\r\n");
-	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+	if (WindowsEleven == 0)
+	{
+		BASS_ChannelPause(str);
+		dprintf("	BASS_ChannelPause\r\n");
+	}
+	else
+	if (WindowsEleven = 1)
+	{
+		BASS_WASAPI_Stop(FALSE);
+		dprintf("	BASS_WASAPI_Stop(pause)\r\n");
+	}	
+	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);	
 	paused = 1;
 	return 0;
 }
 
 int bass_stop()
 {
-	BASS_ChannelStop(str);
+	if (WindowsEleven == 0)
+	{
+		BASS_ChannelStop(str);
+		dprintf("	BASS_ChannelStop\r\n");
+	}
+	else
+	if (WindowsEleven = 1)
+	{
+		BASS_WASAPI_Stop(TRUE);
+		dprintf("	BASS_WASAPI_Stop\r\n");
+	}
 	stopped = 1;
 	playing = 0;
 	/*timesPlayed = 0;*/
-	dprintf("	BASS_ChannelStop\r\n");
 	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	return 0;
 }
 
 int bass_resume()
 {
-	BASS_ChannelPlay(str, FALSE);
-	dprintf("	BASS_ChannelPlay\r\n");
+	if (WindowsEleven == 0)
+	{
+		BASS_ChannelPlay(str, FALSE);
+		dprintf("	BASS_ChannelPlay\r\n");
+	}
+	if (WindowsEleven = 1)
+	{
+		BASS_WASAPI_Start;
+		dprintf("	BASS_WASAPI_Start(unpause)\r\n");
+	}
 	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	paused = 0;
 	return 0;
@@ -369,6 +405,9 @@ int bass_clear()
 	if (WindowsEleven == 1)
 	{
 		BASS_WASAPI_Stop(TRUE);
+		BASS_ChannelStop(str);
+		BASS_StreamFree(str);
+		BASS_StreamPutFileData(str, tracks[currentTrack].path, BASS_FILEDATA_END);
 		BASS_WASAPI_Start();
 	}
 	dprintf("	Track for bass_clear is: %d\r\n", currentTrack);
@@ -409,7 +448,7 @@ int bass_forceplay(const char *path)
 	if(WindowsEleven == 1)
 	{
 		BASS_Init(1, 44100, 0, win, NULL);	
-		if (!BASS_WASAPI_Init(-1, 44100, 0, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_AUTOFORMAT	, 0.1, 0, WasapiProc, NULL))
+		if (!BASS_WASAPI_Init(-1, 44100, 2, BASS_WASAPI_EVENT | BASS_WASAPI_CATEGORY_GAMEMEDIA | BASS_WASAPI_AUTOFORMAT	, 0.1, 0, WasapiProc, NULL))
 		{
 			dprintf("	Initialization FAILED\r\n");
 		}
@@ -476,54 +515,55 @@ int bass_forceplay(const char *path)
 		if(WindowsEleven == 0)
 		{
 			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_AUTOFREE | BASS_STREAM_PRESCAN | BASS_SAMPLE_LOOP);
+			if (str) 
+			{
+				strc++;
+				strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
+				strs[strc - 1] = str;
+				dprintf("	BASS_StreamCreateFile %d\r\n", currentTrack);
+				BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+				timesPlayed++;
+				previousTrack = currentTrack;
+				if (changeNotify == 1)
+				{
+					if (notify == 0)
+					{
+						notify = 1;
+						changeNotify = 0;
+					}
+					else
+					if (notify == 1)
+					{
+						if(playing == 1)
+						{
+							notify = 0;
+							changeNotify = 0;
+							dprintf("	BASS finished playback\r\n");
+							playing = 0;
+							SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_ABORTED, 0x0000000);
+						}
+						else
+						if(playing == 0)
+						{
+							notify = 0;
+							changeNotify = 0;
+							dprintf("	BASS finished playback\r\n");
+							stopped = 1;
+							SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
+						}
+					}
+				}
+			}
+			else
+			dprintf("	BASS cannot stream the file! Error: %d\r\n");
 		}
 		else
 		if(WindowsEleven == 1)
 		{
-			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_PRESCAN | BASS_STREAM_DECODE | BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT);
+			PlaybackFinished = 0;
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_PRESCAN | BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT| BASS_SAMPLE_LOOP);
 			BASS_WASAPI_Start();
 		}
-		if (str) 
-		{
-			strc++;
-			strs = (HSTREAM*)realloc((void*)strs, strc * sizeof(*strs));
-			strs[strc - 1] = str;
-			dprintf("	BASS_StreamCreateFile %d\r\n", currentTrack);
-			BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
-			timesPlayed++;
-			previousTrack = currentTrack;
-			if (changeNotify == 1)
-			{
-				if (notify == 0)
-				{
-					notify = 1;
-					changeNotify = 0;
-				}
-				else
-				if (notify == 1)
-				{
-					if(playing == 1)
-					{
-						notify = 0;
-						changeNotify = 0;
-						dprintf("	BASS finished playback\r\n");
-						playing = 0;
-						SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_ABORTED, 0x0000000);
-					}
-					else
-					if(playing == 0)
-					{
-						notify = 0;
-						changeNotify = 0;
-						dprintf("	BASS finished playback\r\n");
-						stopped = 1;
-						SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-					}
-				}
-			}
-		}
-		else
-		dprintf("	BASS cannot stream the file!\r\n");
 	}
 
 	bool strPlay = BASS_ChannelPlay(str, FALSE);
@@ -653,7 +693,8 @@ int bass_play(const char *path)
 		else
 		if(WindowsEleven == 1)
 		{
-			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_PRESCAN | BASS_STREAM_DECODE | BASS_SAMPLE_LOOP | BASS_SAMPLE_FLOAT);
+			PlaybackFinished = 0;
+			str = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_STREAM_PRESCAN | BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT| BASS_SAMPLE_LOOP);
 			BASS_WASAPI_Start();
 		}
 	}
@@ -1579,6 +1620,10 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 		dprintf("	BASS stream volume set at: %d\r\n", finalVolume);
 		BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, finalVolume);
 		BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
+		if (WindowsEleven == 1)
+		{
+			/*BASS_WASAPI_SetVolume(BASS_WASAPI_CURVE_LINEAR, left);*/
+		}
 	}	
 	
 	LPARAM vParam = MAKELPARAM(left, right);
