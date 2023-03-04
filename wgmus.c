@@ -287,6 +287,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 		notify = 0;
 		changeNotify = 0;
 		dprintf("	BASS finished playback\r\n");
+		BASS_StreamFree(dec);
 		playing = 0;
 		SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 		dprintf("	BASS Error: %d\r\n", bassError);
@@ -435,6 +436,7 @@ int bass_stop()
 		dprintf("	BASS Error: %d\r\n", bassError);
 		if (bassError != 0)
 		{
+			BASS_StreamFree(dec);
 			BASS_WASAPI_Free();
 			return 0;
 		}
@@ -502,28 +504,8 @@ int bass_clear()
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 			BASS_WASAPI_Start();
 		}
-		BASS_WASAPI_Start();
 		dprintf("	Track for bass_clear is: %d\r\n", currentTrack);
 		dprintf("	BASS_ChannelStop + StreamFree + ChannelPlay\r\n");
-	}
-	return 0;
-}
-
-int bass_queue(const char *path)
-{
-	if (noFiles == 0)
-	{
-		if (PlaybackMode == 0)
-		{
-			BASS_CD_StreamSetTrack(str, currentTrack);
-			BASS_WASAPI_Start();
-		}
-		else
-		if (PlaybackMode == 1)
-		{
-			BASS_StreamPutFileData(str, tracks[currentTrack].path, BASS_FILEDATA_END);
-			BASS_WASAPI_Start();
-		}
 	}
 	return 0;
 }
@@ -552,7 +534,7 @@ int bass_forceplay(const char *path)
 			BASS_WASAPI_Start();
 			timesPlayed++;
 		}
-	
+		else
 		if (PlaybackMode == 1)
 		{
 			PlaybackFinished = 0;
@@ -573,15 +555,17 @@ int bass_play(const char *path)
 		if (PlaybackMode == 0)
 		{
 			PlaybackFinished = 0;
+			BASS_StreamFree(dec);
 			dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 			BASS_WASAPI_Start();
 			timesPlayed++;
 		}
-		
+		else
 		if (PlaybackMode == 1)
 		{
 				PlaybackFinished = 0;
+				BASS_StreamFree(dec);
 				dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
 				BASS_WASAPI_Start();
