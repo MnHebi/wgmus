@@ -11,9 +11,6 @@
  REPLACE MENTION OF WINMM.DLL, or WIN32.DLL DEPENDING ON RELEASE
  WITH WGMUS.DLL
  
- DOWNLOAD BASS.DLL AND ADDON BASSCD.DLL from UN4SEEN SITE,
- PLACE INTO TOTAL ANNIHILATION DIRECTORY
- 
  DEFAULT MUSIC FOLDER NAME IS tamus
  IT IS ADVISED TO NAME TRACKS IN A MANNER THAT IS CONSISTENT
  FOR EXAMPLE, 00.mp3, 01.mp3, AND SO FORTH
@@ -30,8 +27,12 @@
  ogg-winmm
  Copyright (c) 2012 Toni Spets <toni.spets@iki.fi>
  BASS 2.4
- Copyright (c) 1999-2021 Un4seen Developments Ltd. All rights reserved.	
+ Copyright (c) 1999-2022 Un4seen Developments Ltd. All rights reserved.	
  BASSCD 2.4
  Copyright (c) 2003-2022 Un4seen Developments Ltd. All rights reserved.
+ BASSmix 2.4
+ Copyright (c) 2005-2022 Un4seen Developments Ltd. All rights reserved.
+ BASSWASAPI 2.4
+ Copyright (c) 2009-2020 Un4seen Developments Ltd. All rights reserved.
  
  /***************************************************************************/
