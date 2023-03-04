@@ -15,7 +15,6 @@
  IT IS ADVISED TO NAME TRACKS IN A MANNER THAT IS CONSISTENT
  FOR EXAMPLE, 00.mp3, 01.mp3, AND SO FORTH
  NOT 1.mp3 to 9.mp3, THEN 10 to 16 MP3 AS THEY WILL BE LOADED IN THE "WRONG" ORDER.
- FREQUENCY SHOULD BE 48kHz(48000hz), OTHERWISE PLAYBACK WILL BE FASTER, AND HIGHER PITCH.
  
  SETTINGS ARE CONTROLLED VIA wgmus.ini
  
@@ -31,7 +30,9 @@
  Copyright (c) 1999-2022 Un4seen Developments Ltd. All rights reserved.	
  BASSCD 2.4
  Copyright (c) 2003-2022 Un4seen Developments Ltd. All rights reserved.
+ BASSmix 2.4
+ Copyright (c) 2005-2022 Un4seen Developments Ltd. All rights reserved.
  BASSWASAPI 2.4
-Copyright (c) 2009-2020 Un4seen Developments Ltd. All rights reserved.
+ Copyright (c) 2009-2020 Un4seen Developments Ltd. All rights reserved.
  
  /***************************************************************************/
