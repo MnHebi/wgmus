@@ -4,10 +4,10 @@ EXPORTS
 	mciSendStringA = wgmus_mciSendStringA
 	mciSendCommandA = wgmus_mciSendCommandA
 	auxGetDevCapsA = wgmus_auxGetDevCapsA
-	auxGetNumDevs = wgmus_auxGetNumDevs
+	auxGetNumDevs = winmm.auxGetNumDevs
 	auxGetVolume = wgmus_auxGetVolume
 	auxSetVolume = wgmus_auxSetVolume
 	PlaySoundA = winmm.PlaySoundA
-	waveOutGetNumDevs = wgmus_waveOutGetNumDevs
+	waveOutGetNumDevs = winmm.waveOutGetNumDevs
 	waveOutGetVolume = winmm.waveOutGetVolume
 	waveOutSetVolume = winmm.waveOutSetVolume
