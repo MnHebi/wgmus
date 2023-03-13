@@ -278,7 +278,7 @@ void wgmus_config()
 
 DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
-	DWORD c = BASS_ChannelGetData(str, buffer, length);
+	DWORD c = BASS_ChannelGetData(dec, buffer, length);
 	bassDecodePos = BASS_ChannelGetPosition(dec, BASS_POS_DECODE);
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
 	int bassError = BASS_ErrorGetCode();
@@ -289,7 +289,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 		dprintf("	BASS finished playback\r\n");
 		BASS_StreamFree(dec);
 		playing = 0;
-		SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
+		SendMessageA((HWND)0x0000, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 		dprintf("	BASS Error: %d\r\n", bassError);
 		dprintf("	BASS no activity\r\n");
 	}
@@ -310,7 +310,7 @@ int bass_init()
 		BASS_WASAPI_INFO info;
 		BASS_WASAPI_GetInfo(&info);
 			
-		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT|BASS_MIXER_NONSTOP);
+		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
 		playeractive = 1;
 		dprintf("	BASS_Init\r\n");
 		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
@@ -514,15 +514,20 @@ int bass_forceplay(const char *path)
 {
 	if (noFiles == 0)
 	{
-		if (!BASS_Init(0, 48000, 0, 0, NULL))
+		wasapiDeviceCheck = BASS_WASAPI_GetDevice();
+		if(wasapiDeviceCheck == -1)
 		{
-			dprintf("	Bass Device Initialization FAILED\r\n");
-		}			
-		if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
-		{
-			dprintf("	Wasapi Device Initialization FAILED\r\n");
+			if (!BASS_Init(0, 48000, 0, 0, NULL))
+			{
+				dprintf("	Bass Device Initialization FAILED\r\n");
+			}			
+			if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+			{
+				dprintf("	Wasapi Device Initialization FAILED\r\n");
+			}
 		}
 		playeractive = 1;
+		dprintf("	bass_forceplay\r\n");
 		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
 		if (PlaybackMode == 0)
@@ -552,6 +557,10 @@ int bass_play(const char *path)
 {
 	if (noFiles == 0)
 	{
+		playeractive = 1;
+		dprintf("	bass_play\r\n");
+		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+		
 		if (PlaybackMode == 0)
 		{
 			PlaybackFinished = 0;
@@ -571,8 +580,6 @@ int bass_play(const char *path)
 				BASS_WASAPI_Start();
 				timesPlayed++;
 		}
-
-		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 	}
 	
 	return 0;
@@ -755,9 +762,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						char trackMilliseconds[3];
 						if (AudioLibrary == 5)
 						{
-							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
+							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
+							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 							int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 							int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
@@ -864,8 +871,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						char trackMilliseconds[3];
 						if (AudioLibrary == 5)
 						{
-							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetLength(str, BASS_POS_BYTE));
-							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(str, BASS_ChannelGetPosition(str, BASS_POS_BYTE));
+							QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
+							QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 							int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 							int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
 							int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
@@ -1256,11 +1263,6 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 	return err;
 }
 
-UINT WINAPI wgmus_auxGetNumDevs()
-{
-	return 1;
-}
-
 MMRESULT WINAPI wgmus_auxGetDevCapsA(UINT_PTR uintptrDeviceID, LPAUXCAPSA lpCapsa, UINT cbCaps)
 {
 	dprintf("	wgmus_auxGetDevCapsA(uintptrDeviceID=%08X, lpCapsa=%p, cbCaps=%08X\n", uintptrDeviceID, lpCapsa, cbCaps);
@@ -1378,15 +1380,5 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 		WasapiVolumeConfig(wasapiVolume, finalVolume);
 	}
 
-    if (dwVolume == oldVolume)
-    {
-        return MMSYSERR_NOERROR;
-    }
-
     return MMSYSERR_NOERROR;
-}
-
-UINT WINAPI wgmus_waveOutGetNumDevs()
-{
-	return 1;
 }
