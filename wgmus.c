@@ -101,6 +101,7 @@ BASS_CHANNELINFO cinfo;
 int PlaybackFinished;
 HFX volFx;
 QWORD bassDecodePos;
+DWORD bassDeviceCheck;
 DWORD wasapiDeviceCheck;
 
 /* BASS PLAYER DEFINES END */
@@ -278,7 +279,7 @@ void wgmus_config()
 
 DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
-	DWORD c = BASS_ChannelGetData(dec, buffer, length);
+	DWORD c = BASS_ChannelGetData(str, buffer, length);
 	bassDecodePos = BASS_ChannelGetPosition(dec, BASS_POS_DECODE);
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
 	int bassError = BASS_ErrorGetCode();
@@ -461,6 +462,7 @@ int bass_resume()
 				BASS_StreamFree(dec);
 				dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
+				BASS_WASAPI_Start();
 			}	
 			else
 			if(PlaybackMode == 1)
@@ -468,9 +470,9 @@ int bass_resume()
 				BASS_StreamFree(dec);
 				dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
+				BASS_WASAPI_Start();
 			}
 		}
-		BASS_WASAPI_Start;
 		dprintf("	BASS_WASAPI_Start(unpause)\r\n");
 		paused = 0;
 	}
@@ -517,10 +519,14 @@ int bass_forceplay(const char *path)
 		wasapiDeviceCheck = BASS_WASAPI_GetDevice();
 		if(wasapiDeviceCheck == -1)
 		{
-			if (!BASS_Init(0, 48000, 0, 0, NULL))
+			bassDeviceCheck = BASS_GetDevice();
+			if(bassDeviceCheck == -1)
 			{
-				dprintf("	Bass Device Initialization FAILED\r\n");
-			}			
+				if (!BASS_Init(0, 48000, 0, 0, NULL))
+				{
+					dprintf("	Bass Device Initialization FAILED\r\n");
+				}
+			}				
 			if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
 			{
 				dprintf("	Wasapi Device Initialization FAILED\r\n");
@@ -557,6 +563,22 @@ int bass_play(const char *path)
 {
 	if (noFiles == 0)
 	{
+		wasapiDeviceCheck = BASS_WASAPI_GetDevice();
+		if(wasapiDeviceCheck == -1)
+		{
+			bassDeviceCheck = BASS_GetDevice();
+			if(bassDeviceCheck == -1)
+			{
+				if (!BASS_Init(0, 48000, 0, 0, NULL))
+				{
+					dprintf("	Bass Device Initialization FAILED\r\n");
+				}
+			}				
+			if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+			{
+				dprintf("	Wasapi Device Initialization FAILED\r\n");
+			}
+		}
 		playeractive = 1;
 		dprintf("	bass_play\r\n");
 		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
