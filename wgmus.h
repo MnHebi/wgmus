@@ -1,3 +1,4 @@
+int WasapiVolumeConfig(float wasapiVol, DWORD streamVol);
 void wgmus_config();
 int bass_init();
 int bass_pause();
