@@ -282,11 +282,13 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 		notify = 0;
 		changeNotify = 0;
 		dprintf("	Finished playback\r\n");
-		BASS_StreamFree(dec);
 		playing = 0;
+		stopped = 1;
 		SendMessageA((HWND)0x0000, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
 		dprintf("	BASS Error: %d\r\n", bassError);
 		dprintf("	BASS no activity\r\n");
+		BASS_WASAPI_Stop(FALSE);
+		return 0;
 	}
     return c;
 }
