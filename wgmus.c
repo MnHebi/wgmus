@@ -103,6 +103,10 @@ BASS_CHANNELINFO cinfo;
 int PlaybackFinished;
 HFX volFx;
 QWORD bassDecodePos;
+QWORD bassGetLength;
+QWORD bassBufferPos;
+QWORD bassFileLength;
+float bassPlaybackProgress;
 DWORD bassDeviceCheck;
 DWORD wasapiDeviceCheck;
 
@@ -277,25 +281,52 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
 	DWORD c = BASS_ChannelGetData(str, buffer, length);
 	bassDecodePos = BASS_ChannelGetPosition(dec, BASS_POS_DECODE);
+	bassGetLength = BASS_ChannelGetLength(dec, BASS_POS_BYTE);
+	bassFileLength =  BASS_StreamGetFilePosition(dec, BASS_FILEPOS_END);
+	bassBufferPos = BASS_StreamGetFilePosition(dec, BASS_FILEPOS_AVAILABLE);
+	bassPlaybackProgress = 100.0 * bassBufferPos / bassFileLength;
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
 	bassError = BASS_ErrorGetCode();
 	if (bassActivity == BASS_ACTIVE_STOPPED)
 	{
 		if(paused == 0)
 		{
-			notify = 0;
-			changeNotify = 0;
-			dprintf("	Finished playback\r\n");
-			playing = 0;
-			stopped = 1;
-			SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-			dprintf("	BASS Error: %d\r\n", bassError);
-			dprintf("	BASS no activity\r\n");
-			BASS_WASAPI_Stop(TRUE);
-			BASS_WASAPI_Start();
-			return 0;
+			if(bassPlaybackProgress == 0)
+			{
+				notify = 0;
+				changeNotify = 0;
+				dprintf("	Finished playback\r\n");
+				playing = 0;
+				stopped = 1;
+				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
+				dprintf("	BASS Error: %d\r\n", bassError);
+				dprintf("	BASS no activity\r\n");
+				BASS_WASAPI_Stop(TRUE);
+				BASS_WASAPI_Start();
+				return 0;
+			}
+		}
+		else
+		if(paused == 1)
+		{
+			if(bassPlaybackProgress == 0)
+			{
+				notify = 0;
+				changeNotify = 0;
+				dprintf("	Finished playback\r\n");
+				playing = 1;
+				stopped = 0;
+				paused = 0;
+				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
+				dprintf("	BASS Error: %d\r\n", bassError);
+				dprintf("	BASS no activity\r\n");
+				BASS_WASAPI_Stop(TRUE);
+				BASS_WASAPI_Start();
+				return 0;
+			}
 		}
 	}
+	
     return c;
 }
 
@@ -445,6 +476,7 @@ int bass_stop()
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
+		BASS_WASAPI_Start();
 		dprintf("	BASS_WASAPI_Stop\r\n");
 		stopped = 1;
 		playing = 0;
@@ -543,6 +575,8 @@ int bass_forceplay(const char *path)
 {
 	if (noFiles == 0)
 	{
+		bassError = BASS_ErrorGetCode();
+		dprintf("	BASS Error: %d\r\n", bassError);
 		if(currentTrack == 0)
 		{
 			currentTrack = 2;
@@ -618,6 +652,8 @@ int bass_play(const char *path)
 {
 	if (noFiles == 0)
 	{
+		bassError = BASS_ErrorGetCode();
+		dprintf("	BASS Error: %d\r\n", bassError);
 		if(currentTrack == 0)
 		{
 			currentTrack = 2;
