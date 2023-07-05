@@ -54,7 +54,6 @@ char musdll_path[2048];
 int FileFormat;
 int PlaybackMode;
 char MusicFolder[255];
-char strFileFormat[5];
 TCHAR MusicFolderFullPath[MAX_PATH];
 char strMusicFile[32];
 TCHAR MusicFileFullPath[MAX_PATH];
@@ -107,6 +106,7 @@ QWORD bassGetLength;
 QWORD bassBufferPos;
 QWORD bassFileLength;
 float bassPlaybackProgress;
+float wasapiVolume;
 DWORD bassDeviceCheck;
 DWORD wasapiDeviceCheck;
 
@@ -127,14 +127,20 @@ int noFiles = 0;
 
 /* AUDIO PLAYBACK DEFINES END */
 
-int WasapiVolumeConfig(float wasapiVol, DWORD streamVol)
+int WasapiVolumeConfig(DWORD streamVol)
 {
-	dprintf("	Wasapi Volume Config wasapiVol: %.2f\r\n", wasapiVol); 
+	if (streamVol >10000) 
+	{
+	streamVol = 10000;
+	}
+	wasapiVolume = (double) streamVol * 0.9 / 10000.0;
+	dprintf("	Wasapi volume: %.2f\r\n", wasapiVolume);
+	
+	dprintf("	Wasapi Volume Config wasapiVolume: %.2f\r\n", wasapiVolume); 
 	dprintf("	Wasapi Volume Config streamVol: %d\r\n", streamVol); 
 	BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, streamVol);
-	BASS_GetConfig(BASS_CONFIG_GVOL_STREAM);
 	
-	return BASS_ChannelSetAttribute(dec, BASS_ATTRIB_VOLDSP, wasapiVol);
+	return BASS_ChannelSetAttribute(dec, BASS_ATTRIB_VOLDSP, wasapiVolume);
 }
 
  
@@ -172,42 +178,21 @@ void wgmus_config()
 	if(FileExists(ConfigFileNameFullPath)) { dprintf("	Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
 	else { dprintf("	Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
 	
+	const char *fileFormats[] = {".wav", ".mp3", ".ogg", ".flac", ".aiff"};
+	unsigned int numFormats = sizeof(fileFormats) / sizeof(fileFormats[0]);
+	
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
+	if (FileFormat >= numFormats)
+	{
+		dprintf("    FileFormat = %d: Invalid - Defaulting to 0\r\n", FileFormat);
+		FileFormat = 0;
+	}
+	dprintf("    File Format is %s\r\n", fileFormats[FileFormat] + 1);
 	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
 	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
 	dprintf("	FileFormat = %d\r\n", FileFormat);
 	dprintf("	PlaybackMode = %d\r\n", PlaybackMode);
 	dprintf("	MusicFolder = %s\r\n", MusicFolder);
-	
-	if(FileFormat == 0)
-	{
-		strcpy(strFileFormat, ".wav");
-		dprintf("	File Format is wav\r\n");
-	}
-	else
-	if(FileFormat == 1)
-	{
-		strcpy(strFileFormat, ".mp3");
-		dprintf("	File Format is mp3\r\n");
-	}
-	else
-	if(FileFormat == 2)
-	{
-		strcpy(strFileFormat, ".ogg");
-		dprintf("	File Format is ogg\r\n");
-	}
-	else
-	if(FileFormat == 3)
-	{
-		strcpy(strFileFormat, ".flac");
-		dprintf("	File Format is FLAC\r\n");
-	}
-	else
-	if(FileFormat == 4)
-	{
-		strcpy(strFileFormat, ".aiff");
-		dprintf("	File Format is AIFF\r\n");
-	}
 
 	strcpy(MusicFolderFullPath, musdll_path);
 	*(strrchr(MusicFolderFullPath, '\\')+1)=0;
@@ -217,7 +202,7 @@ void wgmus_config()
 	strcat(MusicFileFullPath, "\\");
 	dprintf("	Music folder is: %s\r\n", MusicFileFullPath);
 	strcpy(strMusicFile, "*");
-	strcat(strMusicFile, strFileFormat);
+	strcat(strMusicFile, fileFormats[FileFormat]);
 	strcat(MusicFileFullPath, strMusicFile);
 	if (PlaybackMode == 0)
 	{
@@ -385,67 +370,14 @@ int bass_init()
 		dwVolume = dataBuffer;
 		finalVolume = dwVolume * 156.25;
 		dprintf("	BASS initial stream volume set at: %d\r\n", finalVolume);
-			if (finalVolume >= 10000)
-			{
-				wasapiVolume = 1.0;
-			}
-			else
-			if (finalVolume > 9000 && finalVolume < 10000)
-			{
-				wasapiVolume = 0.9;
-			}
-			else
-			if (finalVolume > 8000 && finalVolume < 9000)
-			{
-				wasapiVolume = 0.8;
-			}
-			else
-			if (finalVolume > 7000 && finalVolume < 8000)
-			{
-				wasapiVolume = 0.7;
-			}
-			else
-			if (finalVolume > 6000 && finalVolume < 7000)
-			{
-				wasapiVolume = 0.6;
-			}
-			else
-			if (finalVolume > 5000 && finalVolume < 7000)
-			{
-				wasapiVolume = 0.5;
-			}
-			else
-			if (finalVolume > 4000 && finalVolume < 5000)
-			{
-				wasapiVolume = 0.4;
-			}
-			else
-			if (finalVolume > 3000 && finalVolume < 4000)
-			{
-				wasapiVolume = 0.3;
-			}
-			else
-			if (finalVolume > 2000 && finalVolume < 3000)
-			{
-				wasapiVolume = 0.2;
-			}
-			else
-			if (finalVolume > 0 && finalVolume < 2000)
-			{
-				wasapiVolume = 0.1;
-			}
-			else
-			if (finalVolume == 0)
-			{
-				wasapiVolume = 0.0;
-			}
-		WasapiVolumeConfig(wasapiVolume, finalVolume);
+		WasapiVolumeConfig(finalVolume);
 	}
 	return 0;
 }
 
 int bass_pause()
 {
+	paused = 1;
 	if (noFiles == 0)
 	{
 		bassError = BASS_ErrorGetCode();
@@ -457,7 +389,6 @@ int bass_pause()
 		else
 		BASS_WASAPI_Stop(FALSE);
 		dprintf("	BASS_WASAPI_Stop(pause)\r\n");
-		paused = 1;
 	}
 	return 0;
 }
@@ -489,10 +420,17 @@ int bass_resume()
 {
 	if (noFiles == 0)
 	{
+		if (paused == 1)
+		{
+			BASS_Start();
+			BASS_WASAPI_Start();
+		}
+		
 		if (playing == 1)
 		{
 			BASS_WASAPI_Start();
 		}
+		else
 		if (playing == 0)
 		{
 			if(PlaybackMode == 0)
@@ -575,54 +513,40 @@ int bass_forceplay(const char *path)
 {
 	if (noFiles == 0)
 	{
-		bassError = BASS_ErrorGetCode();
-		dprintf("	BASS Error: %d\r\n", bassError);
-		if(currentTrack == 0)
+		if(paused == 0)
 		{
-			currentTrack = 2;
-		}
-		BASS_StreamFree(dec);
-		wasapiDeviceCheck = BASS_WASAPI_GetDevice();
-		if(wasapiDeviceCheck == -1)
-		{
-			bassDeviceCheck = BASS_GetDevice();
-			if(bassDeviceCheck == -1)
+			bassError = BASS_ErrorGetCode();
+			dprintf("	BASS Error: %d\r\n", bassError);
+			if(currentTrack == 0)
 			{
-				if (!BASS_Init(0, 48000, 0, 0, NULL))
-				{
-					dprintf("	Bass Device Initialization FAILED\r\n");
-				}
-			}				
-			if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
-			{
-				dprintf("	Wasapi Device Initialization FAILED\r\n");
+				currentTrack = 2;
 			}
-		}
-		playeractive = 1;
-		dprintf("	bass_forceplay\r\n");
-		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
-		
-		if (PlaybackMode == 0)
-		{
-			PlaybackFinished = 0;
 			BASS_StreamFree(dec);
-			dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
-			BASS_Mixer_StreamAddChannel(str, dec, 0);
-			BASS_WASAPI_Start();
-			playing = 1;
-			stopped = 0;
-			paused = 0;
-			timesPlayed++;
-		}
-		else
-		if (PlaybackMode == 1)
-		{
-			PlaybackFinished = 0;
-			if(FileFormat != 3)
+			wasapiDeviceCheck = BASS_WASAPI_GetDevice();
+			if(wasapiDeviceCheck == -1)
+			{
+				bassDeviceCheck = BASS_GetDevice();
+				if(bassDeviceCheck == -1)
+				{
+					if (!BASS_Init(0, 48000, 0, 0, NULL))
+					{
+						dprintf("	Bass Device Initialization FAILED\r\n");
+					}
+				}				
+				if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+				{
+					dprintf("	Wasapi Device Initialization FAILED\r\n");
+				}
+			}
+			playeractive = 1;
+			dprintf("	bass_forceplay\r\n");
+			dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+		
+			if (PlaybackMode == 0)
 			{
 				PlaybackFinished = 0;
 				BASS_StreamFree(dec);
-				dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+				dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
 				BASS_WASAPI_Start();
 				playing = 1;
@@ -631,17 +555,34 @@ int bass_forceplay(const char *path)
 				timesPlayed++;
 			}
 			else
-			if(FileFormat == 3)
+			if (PlaybackMode == 1)
 			{
 				PlaybackFinished = 0;
-				BASS_StreamFree(dec);
-				dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
-				BASS_Mixer_StreamAddChannel(str, dec, 0);
-				BASS_WASAPI_Start();
-				playing = 1;
-				stopped = 0;
-				paused = 0;
-				timesPlayed++;
+				if(FileFormat != 3)
+				{
+					PlaybackFinished = 0;
+					BASS_StreamFree(dec);
+					dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+					BASS_Mixer_StreamAddChannel(str, dec, 0);
+					BASS_WASAPI_Start();
+					playing = 1;
+					stopped = 0;
+					paused = 0;
+					timesPlayed++;
+				}
+				else
+				if(FileFormat == 3)
+				{
+					PlaybackFinished = 0;
+					BASS_StreamFree(dec);
+					dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+					BASS_Mixer_StreamAddChannel(str, dec, 0);
+					BASS_WASAPI_Start();
+					playing = 1;
+					stopped = 0;
+					paused = 0;
+					timesPlayed++;
+				}
 			}
 		}
 	}
@@ -652,54 +593,40 @@ int bass_play(const char *path)
 {
 	if (noFiles == 0)
 	{
-		bassError = BASS_ErrorGetCode();
-		dprintf("	BASS Error: %d\r\n", bassError);
-		if(currentTrack == 0)
+		if(paused == 0)
 		{
-			currentTrack = 2;
-		}
-		BASS_StreamFree(dec);
-		wasapiDeviceCheck = BASS_WASAPI_GetDevice();
-		if(wasapiDeviceCheck == -1)
-		{
-			bassDeviceCheck = BASS_GetDevice();
-			if(bassDeviceCheck == -1)
+			bassError = BASS_ErrorGetCode();
+			dprintf("	BASS Error: %d\r\n", bassError);
+			if(currentTrack == 0)
 			{
-				if (!BASS_Init(0, 48000, 0, 0, NULL))
-				{
-					dprintf("	Bass Device Initialization FAILED\r\n");
-				}
-			}				
-			if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
-			{
-				dprintf("	Wasapi Device Initialization FAILED\r\n");
+				currentTrack = 2;
 			}
-		}
-		playeractive = 1;
-		dprintf("	bass_play\r\n");
-		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
-		
-		if (PlaybackMode == 0)
-		{
-			PlaybackFinished = 0;
 			BASS_StreamFree(dec);
-			dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
-			BASS_Mixer_StreamAddChannel(str, dec, 0);
-			BASS_WASAPI_Start();
-			playing = 1;
-			stopped = 0;
-			paused = 0;
-			timesPlayed++;
-		}
-		else
-		if (PlaybackMode == 1)
-		{
-			PlaybackFinished = 0;
-			if(FileFormat != 3)
+			wasapiDeviceCheck = BASS_WASAPI_GetDevice();
+			if(wasapiDeviceCheck == -1)
+			{
+				bassDeviceCheck = BASS_GetDevice();
+				if(bassDeviceCheck == -1)
+				{
+					if (!BASS_Init(0, 48000, 0, 0, NULL))
+					{
+						dprintf("	Bass Device Initialization FAILED\r\n");
+					}
+				}				
+				if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+				{
+					dprintf("	Wasapi Device Initialization FAILED\r\n");
+				}
+			}
+			playeractive = 1;
+			dprintf("	bass_play\r\n");
+			dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+		
+			if (PlaybackMode == 0)
 			{
 				PlaybackFinished = 0;
 				BASS_StreamFree(dec);
-				dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+				dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
 				BASS_WASAPI_Start();
 				playing = 1;
@@ -708,17 +635,34 @@ int bass_play(const char *path)
 				timesPlayed++;
 			}
 			else
-			if(FileFormat == 3)
+			if (PlaybackMode == 1)
 			{
 				PlaybackFinished = 0;
-				BASS_StreamFree(dec);
-				dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
-				BASS_Mixer_StreamAddChannel(str, dec, 0);
-				BASS_WASAPI_Start();
-				playing = 1;
-				stopped = 0;
-				paused = 0;
-				timesPlayed++;
+				if(FileFormat != 3)
+				{
+					PlaybackFinished = 0;
+					BASS_StreamFree(dec);
+					dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+					BASS_Mixer_StreamAddChannel(str, dec, 0);
+					BASS_WASAPI_Start();
+					playing = 1;
+					stopped = 0;
+					paused = 0;
+					timesPlayed++;
+				}
+				else
+				if(FileFormat == 3)
+				{
+					PlaybackFinished = 0;
+					BASS_StreamFree(dec);
+					dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
+					BASS_Mixer_StreamAddChannel(str, dec, 0);
+					BASS_WASAPI_Start();
+					playing = 1;
+					stopped = 0;
+					paused = 0;
+					timesPlayed++;
+				}
 			}
 		}
 	}
@@ -801,6 +745,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				if(paused == 0)
 				{
 					bass_pause();
+					BASS_WASAPI_Stop(FALSE);
 					uintMsg = 0;
 				}
 				return 0;
@@ -824,6 +769,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					closed = 1;
 					opened = 0;
+					bass_stop();
+					BASS_WASAPI_Stop(TRUE);
 					dprintf("	Ignoring close command since TA will still send commands after it, potentially causing freezes\r\n");
 					uintMsg = 0;
 				}
@@ -872,7 +819,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
 					{
-						parms->dwReturn = currentTrack + 1;
+						currentTrack++;
+						parms->dwReturn = currentTrack;
 						dprintf("	Sending current track: %d\r\n", currentTrack);
 						uintMsg = 0;
 					}
@@ -911,13 +859,15 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						else
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
-							parms->dwReturn = currentTrack + 1;
+							currentTrack++;
+							parms->dwReturn = currentTrack;
 							uintMsg = 0;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
-							snprintf(trackNumber, 3, "%02d", currentTrack + 1);
+							currentTrack++;
+							snprintf(trackNumber, 3, "%02d", currentTrack);
 							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
 							snprintf(trackSeconds, 3, "%02d", bassMinutes);
 							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
@@ -1095,34 +1045,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				dprintf("  MCI_PLAY\r\n");
 			
 				LPMCI_PLAY_PARMS parms = (LPVOID)dwParam;
-				if (paused == 1)
-				{
-					if (dwptrCmd & MCI_NOTIFY)
-					{
-						dprintf("	bass_resume from paused via notify\r\n");
-						dwptrCmd = 0;
-						uintMsg = 0;
-						bass_resume();
-					}
-					else
-					if(playing == 1)
-					{
-						BASS_WASAPI_Start();
-						dprintf("	BASS_WASAPI_Start from paused\r\n");
-						paused = 0;
-						uintMsg = 0;
-					}
-					else
-					if(playing == 0)
-					{
-						dprintf("	BASS_WASAPI_Start from paused\r\n");
-						playing = 1;
-						BASS_WASAPI_Start();
-						paused = 0;
-						uintMsg = 0;							
-					}
-				}
-				else
+
 				if (stopped == 1)
 				{
 					stopped = 0;
@@ -1133,22 +1056,18 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						uintMsg = 0;
 					}
 				}
-				else
-				if (playing == 1)
+				
+				if (paused == 1)
 				{
-					if (paused == 1)
+					if (dwptrCmd & MCI_NOTIFY)
 					{
-							BASS_WASAPI_Start();
-							dprintf("	BASS_WASAPI_Start from paused due to unknown interference\r\n");
-							uintMsg = 0;
+						dprintf("	bass_resume from paused via notify\r\n");
+						dwptrCmd = 0;
+						uintMsg = 0;
+						bass_resume();
 					}
-					if (stopped == 1)
-					{
-							BASS_WASAPI_Start();
-							dprintf("	BASS_WASAPI_Start from stopped due to unknown interference\r\n");
-							uintMsg = 0;
-					}						
 				}
+				else
 				if (paused == 0)
 				{
 					if (dwptrCmd & MCI_FROM)
@@ -1171,6 +1090,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					nextTrack = (int)(parms->dwTo);
 					dprintf("	From value: %d\r\n", parms->dwFrom);
 					dprintf("	Current track int value is: %d\r\n", currentTrack);
+					
 
 					if (timesPlayed > 0)
 					{
@@ -1249,7 +1169,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		}
 		if (strstr(lpszCmd, "close cdaudio"))
 		{
-			wgmus_mciSendCommandA(0, MCI_CLOSE, 0, (DWORD_PTR)NULL);
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
@@ -1398,86 +1318,17 @@ MMRESULT WINAPI wgmus_auxSetVolume(UINT uintDeviceID, DWORD dwVolume)
 	WORD left;
 	WORD right;
 	
-	if (dwVolume > 0)
-	{
-		left = dwVolume & 0xffff;
-		dprintf("	Set Left Speaker value at: %08X\r\n", left);
-		right = (dwVolume >> 16) & 0xffff;
-		dprintf("	Set Right Speaker value at: %08X\r\n", right);
-	}
-	else
-	if (dwVolume <= 0)
-	{
-		left = 0 & 0xffff;
-		dprintf("	Set Left Speaker value at: %08X\r\n", left);
-		right = (0 >> 16) & 0xffff;
-		dprintf("	Set Right Speaker value at: %08X\r\n", right);
-	}
+    left = dwVolume & 0xffff;
+    right = (dwVolume >> 16) & 0xffff;
+
+    dprintf("    Set Left Speaker value at: %08X\r\n", left);
+    dprintf("    Set Right Speaker value at: %08X\r\n", right);
 	
-	LPARAM vParam = MAKELPARAM(left, right);
-	dwVolume = vParam;
 	dprintf("	Set aux volume at: %08X\r\n", dwVolume);
 	
-	leftChannel = dwVolume & 0xffff;
-	dprintf("	Left Channel volume: %08X\r\n", leftChannel);
-	finalVolume = leftChannel / 6.554;
+	finalVolume = left / 6.554;
 	dprintf("	BASS stream volume set at: %d\r\n", finalVolume);
-	if (finalVolume >= 10000)
-	{
-		wasapiVolume = 0.9;
-	}
-	else
-	if (finalVolume > 9000 && finalVolume < 10000)
-	{
-		wasapiVolume = 0.8;
-	}
-	else
-	if (finalVolume > 8000 && finalVolume < 9000)
-	{
-		wasapiVolume = 0.7;
-	}
-	else
-	if (finalVolume > 7000 && finalVolume < 8000)
-	{
-		wasapiVolume = 0.6;
-	}
-	else
-	if (finalVolume > 6000 && finalVolume < 7000)
-	{
-		wasapiVolume = 0.5;
-	}
-	else
-	if (finalVolume > 5000 && finalVolume < 7000)
-	{
-		wasapiVolume = 0.4;
-	}
-	else
-	if (finalVolume > 4000 && finalVolume < 5000)
-	{
-		wasapiVolume = 0.3;
-	}
-	else
-	if (finalVolume > 3000 && finalVolume < 4000)
-	{
-		wasapiVolume = 0.2;
-	}
-	else
-	if (finalVolume > 2000 && finalVolume < 3000)
-	{
-		wasapiVolume = 0.1;
-	}
-	else
-	if (finalVolume > 0 && finalVolume < 2000)
-	{
-		wasapiVolume = 0.05;
-	}
-	else
-	if (finalVolume == 0)
-	{
-		wasapiVolume = 0.0;
-	}
-	dprintf("	Wasapi volume: %.2f\r\n", wasapiVolume);
-	WasapiVolumeConfig(wasapiVolume, finalVolume);
+	WasapiVolumeConfig(finalVolume);
 
 
     return MMSYSERR_NOERROR;
