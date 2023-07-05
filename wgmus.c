@@ -228,42 +228,21 @@ void wgmus_config()
 	if(FileExists(ConfigFileNameFullPath)) { dprintf("	Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
 	else { dprintf("	Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
 	
+	const char *fileFormats[] = {".wav", ".mp3", ".ogg", ".flac", ".aiff"};
+	unsigned int numFormats = sizeof(fileFormats) / sizeof(fileFormats[0]);
+	
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
+	if (FileFormat >= numFormats)
+	{
+		dprintf("    FileFormat = %d: Invalid - Defaulting to 0\r\n", FileFormat);
+		FileFormat = 0;
+	}
+	dprintf("    File Format is %s\r\n", fileFormats[FileFormat] + 1);
 	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
 	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
 	dprintf("	FileFormat = %d\r\n", FileFormat);
 	dprintf("	PlaybackMode = %d\r\n", PlaybackMode);
 	dprintf("	MusicFolder = %s\r\n", MusicFolder);
-	
-	if(FileFormat == 0)
-	{
-		strcpy(strFileFormat, ".wav");
-		dprintf("	File Format is wav\r\n");
-	}
-	else
-	if(FileFormat == 1)
-	{
-		strcpy(strFileFormat, ".mp3");
-		dprintf("	File Format is mp3\r\n");
-	}
-	else
-	if(FileFormat == 2)
-	{
-		strcpy(strFileFormat, ".ogg");
-		dprintf("	File Format is ogg\r\n");
-	}
-	else
-	if(FileFormat == 3)
-	{
-		strcpy(strFileFormat, ".flac");
-		dprintf("	File Format is FLAC\r\n");
-	}
-	else
-	if(FileFormat == 4)
-	{
-		strcpy(strFileFormat, ".aiff");
-		dprintf("	File Format is AIFF\r\n");
-	}
 
 	strcpy(MusicFolderFullPath, musdll_path);
 	*(strrchr(MusicFolderFullPath, '\\')+1)=0;
@@ -273,7 +252,7 @@ void wgmus_config()
 	strcat(MusicFileFullPath, "\\");
 	dprintf("	Music folder is: %s\r\n", MusicFileFullPath);
 	strcpy(strMusicFile, "*");
-	strcat(strMusicFile, strFileFormat);
+	strcat(strMusicFile, fileFormats[FileFormat]);
 	strcat(MusicFileFullPath, strMusicFile);
 	if (PlaybackMode == 0)
 	{
@@ -448,6 +427,7 @@ int bass_init()
 
 int bass_pause()
 {
+	paused = 1;
 	if (noFiles == 0)
 	{
 		bassError = BASS_ErrorGetCode();
@@ -459,7 +439,6 @@ int bass_pause()
 		else
 		BASS_WASAPI_Stop(FALSE);
 		dprintf("	BASS_WASAPI_Stop(pause)\r\n");
-		paused = 1;
 	}
 	return 0;
 }
@@ -493,6 +472,7 @@ int bass_resume()
 	{
 		if (paused == 1)
 		{
+			BASS_Start();
 			BASS_WASAPI_Start();
 		}
 		
@@ -889,7 +869,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
 					{
-						parms->dwReturn = currentTrack + 1;
+						currentTrack++;
+						parms->dwReturn = currentTrack;
 						dprintf("	Sending current track: %d\r\n", currentTrack);
 						uintMsg = 0;
 					}
@@ -928,13 +909,15 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						else
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
-							parms->dwReturn = currentTrack + 1;
+							currentTrack++;
+							parms->dwReturn = currentTrack;
 							uintMsg = 0;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
-							snprintf(trackNumber, 3, "%02d", currentTrack + 1);
+							currentTrack++;
+							snprintf(trackNumber, 3, "%02d", currentTrack);
 							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
 							snprintf(trackSeconds, 3, "%02d", bassMinutes);
 							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
@@ -1112,34 +1095,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				dprintf("  MCI_PLAY\r\n");
 			
 				LPMCI_PLAY_PARMS parms = (LPVOID)dwParam;
-				if (paused == 1)
-				{
-					if (dwptrCmd & MCI_NOTIFY)
-					{
-						dprintf("	bass_resume from paused via notify\r\n");
-						dwptrCmd = 0;
-						uintMsg = 0;
-						bass_resume();
-					}
-					else
-					if(playing == 1)
-					{
-						BASS_WASAPI_Start();
-						dprintf("	BASS_WASAPI_Start from paused\r\n");
-						paused = 0;
-						uintMsg = 0;
-					}
-					else
-					if(playing == 0)
-					{
-						dprintf("	BASS_WASAPI_Start from paused\r\n");
-						playing = 1;
-						BASS_WASAPI_Start();
-						paused = 0;
-						uintMsg = 0;							
-					}
-				}
-				else
+
 				if (stopped == 1)
 				{
 					stopped = 0;
@@ -1150,22 +1106,18 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						uintMsg = 0;
 					}
 				}
-				else
-				if (playing == 1)
+				
+				if (paused == 1)
 				{
-					if (paused == 1)
+					if (dwptrCmd & MCI_NOTIFY)
 					{
-							BASS_WASAPI_Start();
-							dprintf("	BASS_WASAPI_Start from paused due to unknown interference\r\n");
-							uintMsg = 0;
+						dprintf("	bass_resume from paused via notify\r\n");
+						dwptrCmd = 0;
+						uintMsg = 0;
+						bass_resume();
 					}
-					if (stopped == 1)
-					{
-							BASS_WASAPI_Start();
-							dprintf("	BASS_WASAPI_Start from stopped due to unknown interference\r\n");
-							uintMsg = 0;
-					}						
 				}
+				else
 				if (paused == 0)
 				{
 					if (dwptrCmd & MCI_FROM)
@@ -1188,6 +1140,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					nextTrack = (int)(parms->dwTo);
 					dprintf("	From value: %d\r\n", parms->dwFrom);
 					dprintf("	Current track int value is: %d\r\n", currentTrack);
+					
 
 					if (timesPlayed > 0)
 					{
