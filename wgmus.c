@@ -52,7 +52,7 @@ char musdll_path[2048];
 /* CONFIG FILE DEFINES START */
 
 int FileFormat;
-enum PLAYBACKMODE{ CD, MFILE } PlaybackMode;
+enum PLAYBACKMODE{ CD, MUSICFILE } PlaybackMode;
 char MusicFolder[255];
 TCHAR MusicFolderFullPath[MAX_PATH];
 char strMusicFile[32];
@@ -116,7 +116,6 @@ DWORD wasapiDeviceCheck;
 
 enum PLAYSTATE{ PLAYING, PAUSED, STOPPED } playState = STOPPED;
 enum PLAYERSTATE{ OPENED, CLOSED } playerState = CLOSED;
-enum INITDONE{ YES, NO } initDone = NO;
 
 int timeFormat = MCI_FORMAT_MILLISECONDS;
 int timesPlayed = 0;
@@ -208,7 +207,7 @@ void wgmus_config()
 		dprintf("	Number of tracks on CD is: %d\r\n", cdTracks);
 	}
 	else
-	if (PlaybackMode == MFILE)
+	if (PlaybackMode == MUSICFILE)
 	{
 		findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
 		int i = 2;
@@ -312,6 +311,13 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 
 int bass_init()
 {
+	static enum INITDONE{ YES, NO } initDone = NO;
+	if (initDone == YES)
+	{
+		dprintf("    BASS already initialized, doing nothing\r\n");
+		return 0;
+	}
+	else
 	if (noFiles == 0)
 	{
 		dprintf("	Audio library for commands is: BASS\r\n");	
@@ -325,6 +331,7 @@ int bass_init()
 		BASS_WASAPI_GetInfo(&info);
 			
 		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
+		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, STREAMPROC_DUMMY, 0);
 		initDone = YES;
 		dprintf("	BASS_Init\r\n");
 		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
@@ -372,7 +379,7 @@ int bass_init()
 
 int bass_pause()
 {
-	playState = PAUSED;;
+	playState = PAUSED;
 	if (noFiles == 0)
 	{
 		bassError = BASS_ErrorGetCode();
@@ -398,9 +405,8 @@ int bass_stop()
 		{
 			if(bassError == -1)
 			{
-				BASS_Stop();
-				BASS_Start();
 				BASS_WASAPI_Stop(TRUE);
+				BASS_StreamFree(dec);
 				BASS_WASAPI_Start();
 				dprintf("	BASS_WASAPI_Stop\r\n");
 				playState = STOPPED;
@@ -415,9 +421,8 @@ int bass_stop()
 			}
 		}
 		else
-		BASS_Stop();
-		BASS_Start();
 		BASS_WASAPI_Stop(TRUE);
+		BASS_StreamFree(dec);
 		BASS_WASAPI_Start();
 		dprintf("	BASS_WASAPI_Stop\r\n");
 		playState = STOPPED;
@@ -444,7 +449,7 @@ int bass_resume()
 		else
 		if (playState != PLAYING)
 		{
-			if(PlaybackMode == 0)
+			if(PlaybackMode == CD)
 			{	
 				if(bassError == 5)
 				{
@@ -455,7 +460,7 @@ int bass_resume()
 				BASS_WASAPI_Start();
 			}	
 			else
-			if(PlaybackMode == 1)
+			if(PlaybackMode == MUSICFILE)
 			{	
 				if(bassError == 5)
 				{
@@ -493,14 +498,14 @@ int bass_clear()
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
-		if(PlaybackMode == 0)
+		if(PlaybackMode == CD)
 		{
 			dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 			BASS_WASAPI_Start();
 		}
 		else
-		if(PlaybackMode == 1)
+		if(PlaybackMode == MUSICFILE)
 		{
 			if(FileFormat != 3)
 			{
@@ -565,7 +570,7 @@ int bass_forceplay(const char *path)
 				timesPlayed++;
 			}
 			else
-			if (PlaybackMode == MFILE)
+			if (PlaybackMode == MUSICFILE)
 			{
 				PlaybackFinished = 0;
 				if(FileFormat != 3)
@@ -638,7 +643,7 @@ int bass_play(const char *path)
 				timesPlayed++;
 			}
 			else
-			if (PlaybackMode == MFILE)
+			if (PlaybackMode == MUSICFILE)
 			{
 				PlaybackFinished = 0;
 				if(FileFormat != 3)
@@ -716,18 +721,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				if(playerState != OPENED)
 				{
 					playerState = OPENED;		
-					if (initDone == NO)
-					{
-						dprintf("	Initialize BASS\r\n");
-						bass_init();
-						uintMsg = 0;
-					}
-					else
-					if (initDone == YES)
-					{
-						dprintf("	BASS already initialized, doing nothing\r\n");
-						uintMsg = 0;
-					}
+					dprintf("	Initialize BASS\r\n");
+					bass_init();
+					uintMsg = 0;
 				}
 				if(playState == PAUSED)
 				{
@@ -752,11 +748,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			if (uintMsg == MCI_STOP)
 			{
 				dprintf("  MCI_STOP\r\n");
-				if(playState == STOPPED)
-				{
-					bass_stop();
-					uintMsg = 0;
-				}
+				bass_stop();
+				uintMsg = 0;
 				return 0;
 			}
 			else
@@ -881,21 +874,21 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							uintMsg = 0;
 						}
 						else
-						if(playState = PAUSED)
+						if(playState == PAUSED)
 						{
 							dprintf("        we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
 							uintMsg = 0;
 						}
 						else
-						if(playState = STOPPED)
+						if(playState == STOPPED)
 						{
 							dprintf("        we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
 							uintMsg = 0;
 						}
 						else
-						if(playState = PLAYING)
+						if(playState == PLAYING)
 						{
 							dprintf("        we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
@@ -905,7 +898,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					return 0;
 				}
 				else
-				if (PlaybackMode == MFILE)
+				if (PlaybackMode == MUSICFILE)
 				{
 					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 					{
@@ -985,21 +978,21 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							uintMsg = 0;
 						}
 						else
-						if(playState = PAUSED)
+						if(playState == PAUSED)
 						{
 							dprintf("        we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
 							uintMsg = 0;
 						}
 						else
-						if(playState = STOPPED)
+						if(playState == STOPPED)
 						{
 							dprintf("        we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
 							uintMsg = 0;
 						}
 						else
-						if(playState = PLAYING)
+						if(playState == PLAYING)
 						{
 							dprintf("        we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
