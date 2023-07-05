@@ -109,6 +109,7 @@ float bassPlaybackProgress;
 float wasapiVolume;
 DWORD bassDeviceCheck;
 DWORD wasapiDeviceCheck;
+DWORD bassStarted;
 
 /* BASS PLAYER DEFINES END */
 
@@ -314,7 +315,28 @@ int bass_init()
 	static enum INITDONE{ YES, NO } initDone = NO;
 	if (initDone == YES)
 	{
-		dprintf("    BASS already initialized, doing nothing\r\n");
+		dprintf("    BASS already initialized, checking device status\r\n");
+		bassStarted = BASS_IsStarted();
+		bassDeviceCheck = BASS_WASAPI_GetDevice();
+		
+		if(bassStarted == 0)
+		{
+			dprintf("    BASS Device was not intialized, initializing\r\n");
+			BASS_Init(0, 4800, 0, 0, NULL);
+		}
+		else
+		dprintf("	BASS_Init already done & device is operational, doing nothing\r\n");
+		
+		if(bassDeviceCheck == -1)
+		{
+			BASS_WASAPI_Free();
+			dprintf("    BASS WASAPI Device was not initialized, initializing\r\n");
+			BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
+		}
+		else
+		{
+			dprintf("	BASS_WASAPI_Init already done & device is operational, doing nothing\r\n");
+		}
 		return 0;
 	}
 	else
@@ -322,10 +344,7 @@ int bass_init()
 	{
 		dprintf("	Audio library for commands is: BASS\r\n");	
 		BASS_Init(0, 48000, 0, 0, NULL);
-		if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
-		{
-			dprintf("	Initialization FAILED Music Device\r\n");
-		}
+		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
 		int a, count=0;
 		BASS_WASAPI_INFO info;
 		BASS_WASAPI_GetInfo(&info);
@@ -867,7 +886,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
 						dprintf("      MCI_STATUS_MODE\r\n");
-						if(playerState = OPENED && playState != PLAYING)
+						if(playerState == OPENED && playState != PLAYING)
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
@@ -971,12 +990,19 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
 						dprintf("      MCI_STATUS_MODE\r\n");
-						if(playerState = OPENED && playState != PLAYING)
+						if(playerState == OPENED && playState != PLAYING)
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
 							uintMsg = 0;
 						}
+						else
+						if(playerState == CLOSED && playState != PLAYING)
+						{
+							dprintf("        player not ready\r\n");
+							parms->dwReturn = MCI_MODE_NOT_READY;
+							uintMsg = 0;
+						}							
 						else
 						if(playState == PAUSED)
 						{
