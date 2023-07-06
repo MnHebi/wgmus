@@ -399,7 +399,7 @@ int bass_stop()
 	{
 		bassError = BASS_ErrorGetCode();
 		dprintf("	BASS Error: %d\r\n", bassError);
-		if (bassError != 0)
+		if (bassError != 0 && bassError != 5)
 		{
 			BASS_WASAPI_Free();
 			dprintf("	BASS_WASAPI_Free\r\n");
@@ -407,6 +407,7 @@ int bass_stop()
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
+		BASS_StreamFree(dec);
 		BASS_WASAPI_Start();
 		dprintf("	BASS_WASAPI_Stop\r\n");
 		stopped = 1;
@@ -426,11 +427,6 @@ int bass_resume()
 			BASS_WASAPI_Start();
 		}
 		
-		if (playing == 1)
-		{
-			BASS_WASAPI_Start();
-		}
-		else
 		if (playing == 0)
 		{
 			if(PlaybackMode == 0)
