@@ -106,9 +106,6 @@ QWORD bassBufferPos;
 QWORD bassFileLength;
 float bassPlaybackProgress;
 float wasapiVolume;
-DWORD bassDeviceCheck;
-DWORD wasapiDeviceCheck;
-DWORD bassStarted;
 
 /* BASS PLAYER DEFINES END */
 
@@ -323,6 +320,9 @@ int bass_init()
 	int a, count=0;
 	BASS_WASAPI_INFO info;
 	BASS_WASAPI_GetInfo(&info);
+	DWORD bassStarted;
+	DWORD bassDeviceCheck;
+	DWORD wasapiDeviceCheck;
 	
 	bassStarted = BASS_IsStarted();
 	bassDeviceCheck = BASS_WASAPI_GetDevice();
@@ -614,6 +614,8 @@ int bass_clear()
 
 int bass_forceplay(const char *path)
 {
+	DWORD bassDeviceCheck;
+	DWORD wasapiDeviceCheck;
 	if (noFiles == 0)
 	{
 		if(playState != PAUSED)
@@ -689,6 +691,8 @@ int bass_forceplay(const char *path)
 
 int bass_play(const char *path)
 {
+	DWORD bassDeviceCheck;
+	DWORD wasapiDeviceCheck;
 	if (noFiles == 0)
 	{
 		if(playState != PAUSED)
