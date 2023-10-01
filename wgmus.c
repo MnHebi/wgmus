@@ -752,6 +752,19 @@ int bass_play(const char *path)
 	return 0;
 }
 
+void WINAPI fake_ExitProcess(UINT uExitCode)
+{
+	BASS_WASAPI_Free();
+	BASS_Free();
+	if (fh)
+	{
+		fclose(fh);
+		fh = NULL;
+	}
+
+	return ExitProcess(uExitCode);
+}
+
 int wgmus_main()
 {
 	wgmus_config();
@@ -774,14 +787,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 	if (fdwReason == DLL_PROCESS_DETACH)
 	{
-		BASS_WASAPI_Free();
-		BASS_Free();
-        if (fh)
-        {
-            fclose(fh);
-            fh = NULL;
-        }
-    }
+
+   	}
 
     return TRUE;
 }
