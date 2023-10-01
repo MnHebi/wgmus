@@ -272,7 +272,15 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 	bassGetLength = BASS_ChannelGetLength(dec, BASS_POS_BYTE);
 	bassFileLength =  BASS_StreamGetFilePosition(dec, BASS_FILEPOS_END);
 	bassBufferPos = BASS_StreamGetFilePosition(dec, BASS_FILEPOS_AVAILABLE);
-	bassPlaybackProgress = 100.0 * bassBufferPos / bassFileLength;
+	if (bassFileLength > 0 ) 
+	{
+		bassPlaybackProgress = 100.0 * bassBufferPos / bassFileLength;
+	}
+	else
+	{
+		dprintf("    File length was 0; setting progress to 100%.\r\n")
+		bassPlaybackProgress = 100.0; // Or idk if should be 0.0 Keeper
+	}
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
 	printBassError("BASS Error Occured");
 	if (bassActivity == BASS_ACTIVE_STOPPED)
