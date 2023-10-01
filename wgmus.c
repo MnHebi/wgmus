@@ -111,7 +111,7 @@ float wasapiVolume;
 
 /* AUDIO PLAYBACK DEFINES START */
 
-enum PLAYSTATE{ STOPPED, PAUSED, PLAYING } playState = STOPPED;
+enum PLAYSTATE{ NOTPLAYING, STOPPED, PAUSED, PLAYING } playState = NOTPLAYING;
 enum PLAYERSTATE{ CLOSED, OPENED } playerState = CLOSED;
 
 int timeFormat = MCI_FORMAT_MILLISECONDS;
@@ -332,7 +332,7 @@ int bass_init()
 	DWORD bassDeviceCheck;
 	DWORD wasapiDeviceCheck;
 	
-	bassStarted = BASS_IsStarted();
+	bassDeviceCheck = BASS_GetDevice();
 	bassDeviceCheck = BASS_WASAPI_GetDevice();
 	
 	static enum INITDONE{ YES, NO } initDone = NO;
@@ -340,7 +340,7 @@ int bass_init()
 	{
 		dprintf("    BASS already initialized, checking device status\r\n");
 		
-		if(bassStarted == 0)
+		if(bassDeviceCheck == -1)
 		{
 			dprintf("    BASS Device was not intialized, initializing\r\n");
 			BASS_Init(0, 4800, 0, 0, NULL);
@@ -348,7 +348,7 @@ int bass_init()
 		else
 		dprintf("	BASS_Init already done & device is operational, doing nothing\r\n");
 		
-		if(bassDeviceCheck == -1)
+		if(wasapiDeviceCheck == -1)
 		{
 			BASS_WASAPI_Free();
 			dprintf("    BASS WASAPI Device was not initialized, initializing\r\n");
@@ -486,7 +486,7 @@ int bass_pause()
 	return 0;
 }
 
-int bass_stop()
+void bass_stop()
 {
 	if (noFiles == 0)
 	{
@@ -500,7 +500,7 @@ int bass_stop()
 				BASS_WASAPI_Start();
 				dprintf("	BASS_WASAPI_Stop\r\n");
 				playState = STOPPED;
-				return 0;
+				return;
 			}
 			else
 			if(BASS_ErrorGetCode() != -1 && BASS_ErrorGetCode() != 5)
@@ -508,7 +508,7 @@ int bass_stop()
 				BASS_WASAPI_Free();
 				bass_init();
 				dprintf("	BASS_WASAPI_Free\r\n");
-				return 0;
+				return;
 			}
 		}
 		else
@@ -519,7 +519,7 @@ int bass_stop()
 		playState = STOPPED;
 		/*timesPlayed = 0;*/
 	}
-	return 0;
+	return;
 }
 
 int bass_resume()
@@ -624,6 +624,8 @@ int bass_forceplay(const char *path)
 {
 	DWORD bassDeviceCheck;
 	DWORD wasapiDeviceCheck;
+	bassDeviceCheck = BASS_GetDevice();
+	wasapiDeviceCheck = BASS_WASAPI_GetDevice();
 	if (noFiles == 0)
 	{
 		if(playState != PAUSED)
@@ -634,7 +636,6 @@ int bass_forceplay(const char *path)
 				currentTrack = 2;
 			}
 			BASS_StreamFree(dec);
-			wasapiDeviceCheck = BASS_WASAPI_GetDevice();
 			if(wasapiDeviceCheck == -1)
 			{
 				bassDeviceCheck = BASS_GetDevice();
@@ -644,10 +645,13 @@ int bass_forceplay(const char *path)
 					{
 						dprintf("	Bass Device Initialization FAILED\r\n");
 					}
-				}				
-				if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+				}
+				if(wasapiDeviceCheck == -1)
 				{
-					dprintf("	Wasapi Device Initialization FAILED\r\n");
+					if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+					{
+						dprintf("	Wasapi Device Initialization FAILED\r\n");
+					}
 				}
 			}
 			dprintf("	bass_forceplay\r\n");
@@ -701,6 +705,8 @@ int bass_play(const char *path)
 {
 	DWORD bassDeviceCheck;
 	DWORD wasapiDeviceCheck;
+	bassDeviceCheck = BASS_GetDevice();
+	wasapiDeviceCheck = BASS_WASAPI_GetDevice();
 	if (noFiles == 0)
 	{
 		if(playState != PAUSED)
@@ -711,7 +717,6 @@ int bass_play(const char *path)
 				currentTrack = 2;
 			}
 			BASS_StreamFree(dec);
-			wasapiDeviceCheck = BASS_WASAPI_GetDevice();
 			if(wasapiDeviceCheck == -1)
 			{
 				bassDeviceCheck = BASS_GetDevice();
@@ -721,10 +726,13 @@ int bass_play(const char *path)
 					{
 						dprintf("	Bass Device Initialization FAILED\r\n");
 					}
-				}				
-				if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+				}
+				if(wasapiDeviceCheck == -1)
 				{
-					dprintf("	Wasapi Device Initialization FAILED\r\n");
+					if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
+					{
+						dprintf("	Wasapi Device Initialization FAILED\r\n");
+					}
 				}
 			}
 			dprintf("	bass_play\r\n");
@@ -984,14 +992,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
 						dprintf("      MCI_STATUS_MODE\r\n");
-						if(playerState == OPENED && playState != PLAYING)
+						if(playerState == OPENED && playState == NOTPLAYING)
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
 							uintMsg = 0;
 						}
 						else
-						if(playerState == CLOSED && playState != PLAYING)
+						if(playerState == CLOSED && playState == NOTPLAYING)
 						{
 							dprintf("        player not ready\r\n");
 							parms->dwReturn = MCI_MODE_NOT_READY;
@@ -1095,14 +1103,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
 						dprintf("      MCI_STATUS_MODE\r\n");
-						if(playerState == OPENED && playState != PLAYING)
+						if(playerState == OPENED && playState == NOTPLAYING)
 						{
 							dprintf("        we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
 							uintMsg = 0;
 						}
 						else
-						if(playerState == CLOSED && playState != PLAYING)
+						if(playerState == CLOSED && playState == NOTPLAYING)
 						{
 							dprintf("        player not ready\r\n");
 							parms->dwReturn = MCI_MODE_NOT_READY;
