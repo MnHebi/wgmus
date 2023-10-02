@@ -368,7 +368,7 @@ int bass_init()
 		if(BASS_ErrorGetCode() == 5)
 		{
 			dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
-			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, STREAMPROC_DUMMY, 0);
+			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 		}
 		return 0;
@@ -380,16 +380,17 @@ int bass_init()
 		dprintf("	BASS_Init\r\n");
 		dprintf("    BASS Device initializing\r\n");
 		BASS_Init(0, 4800, 0, 0, NULL);
-		printBassError("BASS Error Occured");
+		printBassError("BASS Error Occured After BASS Init");
 		
 		dprintf("    BASS WASAPI Device initializing\r\n");
 		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
-		printBassError("BASS Error Occured");
+		printBassError("BASS Error Occured After BASS Wasapi Init");
 
+		BASS_WASAPI_GetInfo(&info);
 		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
-		printBassError("BASS Error Occured");
-		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, STREAMPROC_DUMMY, 0);
-		printBassError("BASS Error Occured");
+		printBassError("BASS Error Occured After Mixer Stream Init");
+		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
+		printBassError("BASS Error Occured After Decoder Stream Init");
 		BASS_Mixer_StreamAddChannel(str, dec, 0);
 		initDone = YES;
 		dprintf("    Checking Player and Play Status\r\n");
