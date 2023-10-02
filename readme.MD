@@ -19,9 +19,9 @@
  SETTINGS ARE CONTROLLED VIA wgmus.ini
  
  SPECIAL THANKS:
- THALDREN,
- KEVIN HAKE,
- ARMOURED FISH
+ FunkyFr3sh,
+ Kevin Hake,
+ Armoured Fish
  
  COPYRIGHT MENTIONS:
  ogg-winmm
