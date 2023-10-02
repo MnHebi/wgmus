@@ -21,7 +21,7 @@
  SPECIAL THANKS:
  FunkyFr3sh,
  Kevin Hake,
- Armoured Fish
+ Armoured Fish.
  
  COPYRIGHT MENTIONS:
  ogg-winmm
