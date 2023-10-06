@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <string.h>
+#include "patch.h"
 
 
 /* AUDIO LIBRARY INCLUDES START */
@@ -282,7 +283,6 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 		bassPlaybackProgress = 100.0; // Or idk if should be 0.0 Keeper
 	}
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
-	printBassError("BASS Error Occured");
 	if (bassActivity == BASS_ACTIVE_STOPPED)
 	{
 		if(playState != PAUSED)
@@ -294,7 +294,6 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 				dprintf("	Finished playback\r\n");
 				playState = STOPPED;
 				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-				printBassError("BASS Error Occured");
 				dprintf("	BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
@@ -311,7 +310,6 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 				dprintf("	Finished playback\r\n");
 				playState = PLAYING;
 				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-				printBassError("BASS Error Occured");
 				dprintf("	BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
@@ -343,15 +341,21 @@ int bass_init()
 		if(bassDeviceCheck == -1)
 		{
 			dprintf("    BASS Device was not intialized, initializing\r\n");
+			playerState = OPENED;
+			playState = NOTPLAYING;
 			BASS_Init(0, 4800, 0, 0, NULL);
 		}
 		else
-		dprintf("	BASS_Init already done & device is operational, doing nothing\r\n");
+		{
+			dprintf("	BASS_Init already done & device is operational, doing nothing\r\n");
+		}
 		
 		if(wasapiDeviceCheck == -1)
 		{
 			BASS_WASAPI_Free();
-			dprintf("	BASS WASAPI Device was not initialized, initializing\r\n");
+			playerState = OPENED;
+			playState = NOTPLAYING;
+			dprintf("    BASS WASAPI Device was not initialized, initializing\r\n");
 			BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
 		}
 		else
@@ -378,7 +382,7 @@ int bass_init()
 	{
 		dprintf("	Audio library for commands is: BASS\r\n");
 		dprintf("	BASS_Init\r\n");
-		dprintf("	BASS Device initializing\r\n");
+		dprintf("    BASS Device initializing\r\n");
 		BASS_Init(0, 4800, 0, 0, NULL);
 		printBassError("BASS Error Occured After BASS Init");
 		
@@ -394,7 +398,7 @@ int bass_init()
 		BASS_Mixer_StreamAddChannel(str, dec, 0);
 		initDone = YES;
 		dprintf("    Checking Player and Play Status\r\n");
-		printBassError("BASS Error Occured");
+		printBassError("BASS Error occured after initializing player state check");
 		switch (playerState)
 		{
 			case OPENED:
@@ -431,7 +435,7 @@ int bass_init()
 		dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
 		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
-		printBassError("BASS Error Occured");
+		printBassError("BASS Error occured after playerState and playState check");
 		
 		DWORD dataBuffer;
 		DWORD bufferSize = sizeof(dataBuffer);
@@ -474,7 +478,6 @@ int bass_pause()
 {
 	if (noFiles == 0)
 	{
-		printBassError("BASS Error Occured");
 		if (BASS_ErrorGetCode() != 0)
 		{
 			return 0;
@@ -491,7 +494,6 @@ void bass_stop()
 {
 	if (noFiles == 0)
 	{
-		printBassError("BASS Error Occured");
 		if (BASS_ErrorGetCode() != 0)
 		{
 			if(BASS_ErrorGetCode() == -1)
@@ -527,7 +529,6 @@ int bass_resume()
 {
 	if (noFiles == 0)
 	{
-		printBassError("BASS Error Occured");
 		if(playState == PAUSED)
 		{
 			BASS_Start();
@@ -585,7 +586,6 @@ int bass_clear()
 	if (noFiles == 0)
 	{
 		BASS_StreamFree(dec);
-		printBassError("BASS Error Occured");
 		if (BASS_ErrorGetCode() != 0 && BASS_ErrorGetCode() != 5)
 		{
 			return 0;
@@ -631,7 +631,7 @@ int bass_forceplay(const char *path)
 	{
 		if(playState != PAUSED)
 		{
-			printBassError("BASS Error Occured");
+			printBassError("BASS Error occured during forceplay beginning()");
 			if(currentTrack == 0)
 			{
 				currentTrack = 2;
@@ -697,6 +697,7 @@ int bass_forceplay(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
+			printBassError("BASS Error occured during forceplay end()");
 		}
 	}
 	return 0;
@@ -712,7 +713,7 @@ int bass_play(const char *path)
 	{
 		if(playState != PAUSED)
 		{
-			printBassError("BASS Error Occured");
+			printBassError("BASS Error occured during play beginning");
 			if(currentTrack == 0)
 			{
 				currentTrack = 2;
@@ -778,6 +779,7 @@ int bass_play(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
+			printBassError("BASS Error occured during play end");
 		}
 	}
 	
@@ -807,6 +809,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	if (fdwReason == DLL_PROCESS_ATTACH)
 	{
+		/* Make sure we are in Total Annihilation process before patching */
+		HMODULE game_exe = GetModuleHandleA(NULL);
+		if (game_exe && memcmp((char*)game_exe + 0x00010000, "\x14\x68\x78\x1B\x50\x00\x8D\x4C\x24\x1B", 10) == 0)
+		{
+			patch_call_nop((void*)0x004E4708, (void*)fake_ExitProcess);
+			patch_call_nop((void*)0x004E71A0, (void*)fake_ExitProcess);
+			patch_call_nop((void*)0x004EADF2, (void*)fake_ExitProcess);
+		}
+
 		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
 
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
