@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <string.h>
+#include "patch.h"
 
 
 /* AUDIO LIBRARY INCLUDES START */
@@ -808,6 +809,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	if (fdwReason == DLL_PROCESS_ATTACH)
 	{
+		patch_call_nop((void*)0x004E4708, (void*)fake_ExitProcess);
+		patch_call_nop((void*)0x004E71A0, (void*)fake_ExitProcess);
+		patch_call_nop((void*)0x004EADF2, (void*)fake_ExitProcess);
+
 		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
 
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
