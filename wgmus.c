@@ -809,9 +809,14 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	if (fdwReason == DLL_PROCESS_ATTACH)
 	{
-		patch_call_nop((void*)0x004E4708, (void*)fake_ExitProcess);
-		patch_call_nop((void*)0x004E71A0, (void*)fake_ExitProcess);
-		patch_call_nop((void*)0x004EADF2, (void*)fake_ExitProcess);
+		/* Make sure we are in Total Annihilation process before patching */
+		HMODULE game_exe = GetModuleHandleA(NULL);
+		if (game_exe && memcmp((char*)game_exe + 0x00010000, "\x14\x68\x78\x1B\x50\x00\x8D\x4C\x24\x1B", 10) == 0)
+		{
+			patch_call_nop((void*)0x004E4708, (void*)fake_ExitProcess);
+			patch_call_nop((void*)0x004E71A0, (void*)fake_ExitProcess);
+			patch_call_nop((void*)0x004EADF2, (void*)fake_ExitProcess);
+		}
 
 		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
 
