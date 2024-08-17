@@ -107,6 +107,7 @@ QWORD bassBufferPos;
 QWORD bassFileLength;
 float bassPlaybackProgress;
 float wasapiVolume;
+QWORD seekPosition;
 
 /* BASS PLAYER DEFINES END */
 
@@ -683,6 +684,10 @@ int bass_forceplay(const char *path)
 				dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
 				BASS_WASAPI_Start();
+				if (playState == SEEKING)
+				{
+					BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+				}
 				playState = PLAYING;
 				timesPlayed++;
 				dprintf("	Begin CD Playback\r\n");
@@ -698,6 +703,10 @@ int bass_forceplay(const char *path)
 					dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 					BASS_Mixer_StreamAddChannel(str, dec, 0);
 					BASS_WASAPI_Start();
+					if (playState == SEEKING)
+					{
+						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+					}
 					playState = PLAYING;
 					timesPlayed++;
 					dprintf("	Begin Music File Playback\r\n");
@@ -710,6 +719,10 @@ int bass_forceplay(const char *path)
 					dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 					BASS_Mixer_StreamAddChannel(str, dec, 0);
 					BASS_WASAPI_Start();
+					if (playState == SEEKING)
+					{
+						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+					}
 					playState = PLAYING;
 					timesPlayed++;
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
@@ -937,6 +950,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				LPMCI_SEEK_PARMS parms = (LPVOID)dwParam;
 				dprintf("  MCI_SEEK\r\n");
 				
+				seekPosition = parms->dwTo;
+				
 				if (parms->dwTo == MCI_SEEK_TO_END)
 				{
 					dprintf("      MCI_SEEK_TO_END\r\n");
@@ -945,17 +960,18 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				else
 				if (parms->dwTo == MCI_SEEK_TO_START)
 				{
-					dprintf("      MCI_TO\r\n");
+					dprintf("      MCI_SEEK_TO_START\r\n");
 					uintMsg = 0;
 				}
 				if (parms->dwTo == MCI_TO)
 				{
-					dprintf("      MCI_TO\r\n");
+					dprintf("      MCI_TO(MCI_SEEK)\r\n");
 					uintMsg = 0;
 				}
 				
 				if(playState == STOPPED)
 				{
+					dprintf("      Change play state to SEEKING\r\n");
 					playState = SEEKING;
 				}
 			}
@@ -1271,12 +1287,12 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (dwptrCmd & MCI_FROM)
 					{
 						notifyDevice = deviceID;
-						dprintf("  MCI_FROM\r\n");
+						dprintf("  MCI_FROM(MCI_PLAY)\r\n");
 					}
 					else
 					if (dwptrCmd & MCI_TO)
 					{
-						dprintf("  MCI_TO\r\n");
+						dprintf("  MCI_TO(MCI_PLAY)\r\n");
 					}
 					
 					if (PlaybackMode == CD)
