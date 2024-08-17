@@ -112,7 +112,7 @@ float wasapiVolume;
 
 /* AUDIO PLAYBACK DEFINES START */
 
-enum PLAYSTATE{ NOTPLAYING, STOPPED, PAUSED, PLAYING } playState = NOTPLAYING;
+enum PLAYSTATE{ NOTPLAYING, STOPPED, PAUSED, SEEKING, PLAYING } playState = NOTPLAYING;
 enum PLAYERSTATE{ CLOSED, OPENED } playerState = CLOSED;
 
 int timeFormat = MCI_FORMAT_MILLISECONDS;
@@ -932,6 +932,34 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				return 0;
 			}
 			else
+			if (uintMsg == MCI_SEEK)
+			{
+				LPMCI_SEEK_PARMS parms = (LPVOID)dwParam;
+				dprintf("  MCI_SEEK\r\n");
+				
+				if (parms->dwTo == MCI_SEEK_TO_END)
+				{
+					dprintf("      MCI_SEEK_TO_END\r\n");
+					uintMsg = 0;
+				}
+				else
+				if (parms->dwTo == MCI_SEEK_TO_START)
+				{
+					dprintf("      MCI_TO\r\n");
+					uintMsg = 0;
+				}
+				if (parms->dwTo == MCI_TO)
+				{
+					dprintf("      MCI_TO\r\n");
+					uintMsg = 0;
+				}
+				
+				if(playState == STOPPED)
+				{
+					playState = SEEKING;
+				}
+			}
+			else
 			if (uintMsg == MCI_STATUS)
 			{
 				LPMCI_STATUS_PARMS parms = (LPVOID)dwParam;
@@ -1066,7 +1094,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							parms->dwReturn = MCI_MODE_PLAY;
 							uintMsg = 0;
 						}
-					}
+						if(playerState == OPENED && playState == SEEKING)
+						{
+							dprintf("        we are playing\r\n");
+							parms->dwReturn = MCI_MODE_SEEK;
+							uintMsg = 0;
+						}
+					}					
 					return 0;
 				}
 				else
@@ -1175,6 +1209,12 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						{
 							dprintf("        we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
+							uintMsg = 0;
+						}
+						if(playerState == OPENED && playState == SEEKING)
+						{
+							dprintf("        we are playing\r\n");
+							parms->dwReturn = MCI_MODE_SEEK;
 							uintMsg = 0;
 						}
 					}
