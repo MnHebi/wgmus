@@ -451,7 +451,7 @@ int bass_init()
 		DWORD finalVolume = 0;
 		float wasapiVolume;
 		HKEY hkey;
-		if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\TotalM\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
+		if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\LucasArts Entertainment Company LLC\\Star Wars Galactic Battlegrounds: Expanding Fronts\\1.0"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
 		{
 			printf("failed to open key");
 			return 1;
@@ -459,7 +459,7 @@ int bass_init()
 
 		LRESULT status = RegQueryValueEx(
 		hkey,
-		TEXT("musicvol"),
+		TEXT("Music Volume"),
 		NULL,
 		NULL,
 		(LPBYTE)&dataBuffer,
