@@ -859,10 +859,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 	if(TRUE)
 	{
 		dprintf("mciSendCommandA(deviceID=%p, uintMsg=%p, dwptrCmd=%p, dwParam=%p)\r\n", deviceID, uintMsg, dwptrCmd, dwParam);
-		if (deviceID == MAGIC_DEVICEID)
-		{
 			if (uintMsg == MCI_OPEN)
 			{
+				LPMCI_OPEN_PARMS parms = (LPVOID)dwParam;
 				dprintf("  MCI_OPEN\r\n");
 				if(playerState != OPENED)
 				{
@@ -877,6 +876,17 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					uintMsg = 0;
 				}
 				return 0;
+				
+				if (uintMsg & MCI_OPEN_TYPE_ID)
+				{
+					dprintf("    MCI_OPEN_TYPE_ID\r\n");
+					if (LOWORD(parms->lpstrDeviceType) == MCI_DEVTYPE_CD_AUDIO)
+					{
+						dprintf("  Returning magic device id for MCI_DEVTYPE_CD_AUDIO\r\n");
+						parms->wDeviceID = MAGIC_DEVICEID;
+						return 0;
+					}
+				}
 			}
 			else
 			if (uintMsg == MCI_PAUSE)
@@ -1270,7 +1280,6 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				return 0;
 			}
 		}
-	}
 	return MCIERR_UNRECOGNIZED_COMMAND;
 }
 
@@ -1288,32 +1297,39 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		
 		int cTrack = 0;
 		
-		if (strstr(lpszCmd, "open cdaudio"))
+		if (strstr(lpszCmd, "sysinfo"))
+		{
+			dprintf("      sysinfo call received, return cd");
+			strcpy(lpszRetStr, "cd");
+			return 0;
+		}
+		
+		if (strstr(lpszCmd, "open cd"))
 		{
 			static MCI_WAVE_OPEN_PARMS waveParms;
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "pause cdaudio"))
+		if (strstr(lpszCmd, "pause cd"))
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PAUSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "stop cdaudio"))
+		if (strstr(lpszCmd, "stop cd"))
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STOP, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "close cdaudio"))
+		if (strstr(lpszCmd, "close cd"))
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "set cdaudio time format milliseconds"))
+		if (strstr(lpszCmd, "set cd time format milliseconds"))
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;	
@@ -1321,7 +1337,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "set cdaudio time format tmsf"))
+		if (strstr(lpszCmd, "set cd time format tmsf"))
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_TMSF;
@@ -1329,7 +1345,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "status cdaudio number of tracks"))
+		if (strstr(lpszCmd, "status cd number of tracks"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
@@ -1338,7 +1354,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (sscanf(lpszCmd, "status cdaudio type track %d", &cTrack))
+		if (sscanf(lpszCmd, "status cd type track %d", &cTrack))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
@@ -1348,7 +1364,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "status cdaudio mode"))
+		if (strstr(lpszCmd, "status cd mode"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_MODE;
@@ -1356,7 +1372,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "status cdaudio current track"))
+		if (strstr(lpszCmd, "status cd current track"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_CURRENT_TRACK;
@@ -1386,7 +1402,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
         }
 		int from = -1, to = -1;
-		if (sscanf(lpszCmd, "play cdaudio from %d to %d notify", &from, &to))
+		if (sscanf(lpszCmd, "play cd from %d to %d notify", &from, &to))
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
@@ -1396,7 +1412,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
 		}
 		else
-		if (sscanf(lpszCmd, "play cdaudio from %d notify", &from))
+		if (sscanf(lpszCmd, "play cd from %d notify", &from))
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
@@ -1405,7 +1421,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
 		}
 		else
-		if (sscanf(lpszCmd, "play cdaudio from %d", &from))
+		if (sscanf(lpszCmd, "play cd from %d", &from))
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
@@ -1414,7 +1430,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
 		}
 		else
-		if (strstr(lpszCmd, "play cdaudio notify"))
+		if (strstr(lpszCmd, "play cd notify"))
 		{
 			static MCI_PLAY_PARMS parms;
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_NOTIFY, (DWORD_PTR)&parms);

@@ -3,6 +3,14 @@ LIBRARY winmm.dll
 EXPORTS
 	mciSendStringA = wgmus_mciSendStringA
 	mciSendCommandA = wgmus_mciSendCommandA
+	mciGetErrorStringA = winmm.mciGetErrorStringA
+	mixerSetControlDetails = winmm.mixerSetControlDetails
+	mixerGetNumDevs = winmm.mixerGetNumDevs
+	mixerOpen = winmm.mixerOpen
+	mixerGetLineInfoA = winmm.mixerGetLineInfoA
+	mixerGetLineControlsA = winmm.mixerGetLineControlsA
+	mixerGetControlDetailsA = winmm.mixerGetControlDetailsA
+	mixerClose = winmm.mixerClose
 	auxGetDevCapsA = wgmus_auxGetDevCapsA
 	auxGetNumDevs = winmm.auxGetNumDevs
 	auxGetVolume = wgmus_auxGetVolume
@@ -11,3 +19,11 @@ EXPORTS
 	waveOutGetNumDevs = winmm.waveOutGetNumDevs
 	waveOutGetVolume = winmm.waveOutGetVolume
 	waveOutSetVolume = winmm.waveOutSetVolume
+    tid32Message = winmm.tid32Message
+    timeBeginPeriod = winmm.timeBeginPeriod
+    timeEndPeriod = winmm.timeEndPeriod
+    timeGetDevCaps = winmm.timeGetDevCaps
+    timeGetSystemTime = winmm.timeGetSystemTime
+    timeGetTime = winmm.timeGetTime
+    timeKillEvent = winmm.timeKillEvent
+    timeSetEvent = winmm.timeSetEvent
