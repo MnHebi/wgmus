@@ -109,6 +109,11 @@ float bassPlaybackProgress;
 float wasapiVolume;
 QWORD seekPosition;
 
+char trackNumber[3];
+char trackSeconds[3];
+char trackMilliseconds[3];
+char trackMinutes[3];
+
 /* BASS PLAYER DEFINES END */
 
 /* AUDIO PLAYBACK DEFINES START */
@@ -778,6 +783,10 @@ int bass_play(const char *path)
 				dec = BASS_CD_StreamCreate(0, currentTrack, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
 				BASS_Mixer_StreamAddChannel(str, dec, 0);
 				BASS_WASAPI_Start();
+				if (playState == SEEKING)
+				{
+					BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+				}
 				playState = PLAYING;
 				timesPlayed++;
 				dprintf("	Begin CD Playback\r\n");
@@ -793,6 +802,10 @@ int bass_play(const char *path)
 					dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 					BASS_Mixer_StreamAddChannel(str, dec, 0);
 					BASS_WASAPI_Start();
+					if (playState == SEEKING)
+					{
+						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+					}
 					playState = PLAYING;
 					timesPlayed++;
 					dprintf("	Begin Music File Playback\r\n");
@@ -805,6 +818,10 @@ int bass_play(const char *path)
 					dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 					BASS_Mixer_StreamAddChannel(str, dec, 0);
 					BASS_WASAPI_Start();
+					if (playState == SEEKING)
+					{
+						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+					}
 					playState = PLAYING;
 					timesPlayed++;
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
@@ -1026,9 +1043,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						char trackNumber[3];
-						char trackSeconds[3];
-						char trackMilliseconds[3];
+						dprintf("      MCI_STATUS_POSITION\r\n");
 						
 						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
@@ -1037,41 +1052,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
 						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
-						if (dwptrCmd & MCI_TRACK)
-						{
-							parms->dwTrack -= 1;
-							queriedCdTrack = parms->dwTrack;
-							if(timeFormat == MCI_FORMAT_MILLISECONDS)
-							{
-								queriedCdTrack += 1;
-								parms->dwReturn = queriedCdTrack;
-								uintMsg = 0;
-							}
-							else
-							if(timeFormat == MCI_FORMAT_TMSF)
-							{
-								queriedCdTrack += 1;
-								parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
-								uintMsg = 0;
-							}
-						}
-						else
-						if(timeFormat == MCI_FORMAT_MILLISECONDS)
-						{
-							currentTrack++;
-							parms->dwReturn = currentTrack;
-							uintMsg = 0;
-						}
-						else
-						if(timeFormat == MCI_FORMAT_TMSF)
-						{
-							currentTrack++;
-							snprintf(trackNumber, 3, "%02d", currentTrack);
-							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-							snprintf(trackSeconds, 3, "%02d", bassMinutes);
-							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
-							uintMsg = 0;
-						}
+						currentTrack++;
+						snprintf(trackNumber, 3, "%02d", currentTrack);
+						snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
+						snprintf(trackSeconds, 3, "%02d", bassSeconds);
+						snprintf(trackMinutes, 3, "02d", bassMinutes);
+						parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackMinutes, trackSeconds, 0);
+						dprintf("	sent track position\r\n");
+						uintMsg = 0;
 					}
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
@@ -1148,47 +1136,20 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						char trackNumber[3];
-						char trackSeconds[3];
-						char trackMilliseconds[3];
+						dprintf("      MCI_STATUS_POSITION\r\n");
 
 						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
 						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
 						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
-						if (dwptrCmd & MCI_TRACK)
-						{
-							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-							queriedTrack = (int)(parms->dwTrack);
-							if(timeFormat == MCI_FORMAT_MILLISECONDS)
-							{
-								parms->dwReturn = queriedTrack;
-								uintMsg = 0;
-							}
-							else
-							if(timeFormat == MCI_FORMAT_TMSF)
-							{
-								parms->dwReturn = MCI_MAKE_TMSF(queriedTrack, 0, 0, 0);
-								uintMsg = 0;
-							}
-						}
-						else
-						if(timeFormat == MCI_FORMAT_MILLISECONDS)
-						{
-							parms->dwReturn = currentTrack;
-							uintMsg = 0;
-						}
-						else
-						if(timeFormat == MCI_FORMAT_TMSF)
-						{
-							snprintf(trackNumber, 3, "%02d", currentTrack);
-							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-							snprintf(trackSeconds, 3, "%02d", bassMinutes);
-							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
-							uintMsg = 0;
-						}
+						snprintf(trackNumber, 3, "%02d", currentTrack);
+						snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
+						snprintf(trackSeconds, 3, "%02d", bassMinutes);
+						snprintf(trackMinutes, 3, "02d", bassMinutes);
+						parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+						dprintf("	sent track position\r\n");
+						uintMsg = 0;
 					}
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
