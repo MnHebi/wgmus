@@ -109,10 +109,9 @@ float bassPlaybackProgress;
 float wasapiVolume;
 QWORD seekPosition;
 
-char trackNumber[3];
-char trackSeconds[3];
-char trackMilliseconds[3];
-char trackMinutes[3];
+int bassMilliseconds = 0;
+int bassSeconds = 0;
+int bassMinutes = 0;
 
 /* BASS PLAYER DEFINES END */
 
@@ -967,22 +966,23 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				LPMCI_SEEK_PARMS parms = (LPVOID)dwParam;
 				dprintf("  MCI_SEEK\r\n");
 				
-				seekPosition = parms->dwTo;
-				
-				if (parms->dwTo == MCI_SEEK_TO_END)
+				if (dwptrCmd & MCI_SEEK_TO_END)
 				{
 					dprintf("      MCI_SEEK_TO_END\r\n");
 					uintMsg = 0;
 				}
 				else
-				if (parms->dwTo == MCI_SEEK_TO_START)
+				if (dwptrCmd & MCI_SEEK_TO_START)
 				{
 					dprintf("      MCI_SEEK_TO_START\r\n");
 					uintMsg = 0;
 				}
-				if (parms->dwTo == MCI_TO)
+				if (dwptrCmd & MCI_TO)
 				{
 					dprintf("      MCI_TO(MCI_SEEK)\r\n");
+					currentTrack = MCI_TMSF_TRACK(parms->dwTo);
+					dprintf("      		MCI_SEEK retrieved track number: %d\r\n", currentTrack);
+					seekPosition = parms->dwTo;
 					uintMsg = 0;
 				}
 				
@@ -1049,15 +1049,17 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
-						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
-						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+						bassMilliseconds = 0;
+						bassSeconds = 0;
+						bassMinutes = 0;
+						bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
+						bassSeconds = bassLengthInSeconds - bassPosInSeconds;
+						bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
 						currentTrack++;
-						snprintf(trackNumber, 3, "%02d", currentTrack);
-						snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-						snprintf(trackSeconds, 3, "%02d", bassSeconds);
-						snprintf(trackMinutes, 3, "02d", bassMinutes);
-						parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackMinutes, trackSeconds, 0);
+						dprintf("     		 currentTrack: %d\r\n", currentTrack);
+						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
+						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
+						parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMilliseconds/60000, bassMilliseconds/1000%60, 0);
 						dprintf("	sent track position\r\n");
 						uintMsg = 0;
 					}
@@ -1140,14 +1142,16 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 
 						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
-						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
-						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
-						snprintf(trackNumber, 3, "%02d", currentTrack);
-						snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-						snprintf(trackSeconds, 3, "%02d", bassMinutes);
-						snprintf(trackMinutes, 3, "02d", bassMinutes);
-						parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+						bassMilliseconds = 0;
+						bassSeconds = 0;
+						bassMinutes = 0;
+						bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
+						bassSeconds = bassLengthInSeconds - bassPosInSeconds;
+						bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+						dprintf("     		 currentTrack: %d\r\n", currentTrack);
+						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
+						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
+						parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMilliseconds/60000, bassMilliseconds/1000%60, 0);
 						dprintf("	sent track position\r\n");
 						uintMsg = 0;
 					}
@@ -1261,7 +1265,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						parms->dwFrom -= 1;
 					}
 					
-					currentTrack = (int)(parms->dwFrom);
+					currentTrack = MCI_TMSF_TRACK(parms->dwFrom);
 					nextTrack = (int)(parms->dwTo);
 					dprintf("	From value: %d\r\n", parms->dwFrom);
 					dprintf("	Current track int value is: %d\r\n", currentTrack);
