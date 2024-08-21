@@ -110,6 +110,8 @@ float wasapiVolume;
 QWORD seekConversion;
 QWORD seekPosition;
 
+int bassTrackLengthLeft = 0;
+int bassTrackActualPos = 0;
 int bassSecondsCalculate = 0;
 
 int bassMilliseconds = 0;
@@ -1054,9 +1056,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					{
 						dprintf("      MCI_STATUS_POSITION\r\n");
 						
-						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
+						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
+						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 						bassSecondsCalculate = 0;
 						bassFrames = 0;
@@ -1064,11 +1066,21 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						bassSeconds = 0;
 						bassMinutes = 0;
 						bassHours = 0;
-						bassSecondsCalculate = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
+						bassSecondsCalculate = bassTrackActualPos;
 						bassHours = (bassSecondsCalculate/3600);
-						bassMilliseconds = (bassSecondsCalculate -(3600*bassHours))*1000;
-						bassMinutes = (bassSecondsCalculate -(3600*bassHours))/60;
-						bassSeconds = (bassSecondsCalculate -(3600*bassHours)-(bassMinutes*60));
+						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
+						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						if(bassMinutes < 0)
+						{
+							bassMinutes = 0;
+						}
+						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassSeconds < 0)
+						{
+							bassSeconds = 0;
+						}
 						bassFrames = bassSeconds*75/1000;
 						currentTrack++;
 						dprintf("     		 currentTrack: %d\r\n", currentTrack);
@@ -1158,19 +1170,31 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					{
 						dprintf("      MCI_STATUS_POSITION\r\n");
 
-						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
+						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
+						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
+						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 						bassSecondsCalculate = 0;
 						bassFrames = 0;
 						bassMilliseconds = 0;
 						bassSeconds = 0;
 						bassMinutes = 0;
 						bassHours = 0;
-						bassSecondsCalculate = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
+						bassSecondsCalculate = bassTrackActualPos;
 						bassHours = (bassSecondsCalculate/3600);
-						bassMilliseconds = (bassSecondsCalculate -(3600*bassHours))*1000;
-						bassMinutes = (bassSecondsCalculate -(3600*bassHours))/60;
-						bassSeconds = (bassSecondsCalculate -(3600*bassHours)-(bassMinutes*60));
+						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
+						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						if(bassMinutes < 0)
+						{
+							bassMinutes = 0;
+						}
+						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassSeconds < 0)
+						{
+							bassSeconds = 0;
+						}
 						bassFrames = bassSeconds*75/1000;
 						dprintf("     		 currentTrack: %d\r\n", currentTrack);
 						dprintf("     		 bassFrames: %d\r\n", bassFrames);
