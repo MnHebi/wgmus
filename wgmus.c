@@ -108,6 +108,21 @@ QWORD bassFileLength;
 float bassPlaybackProgress;
 float wasapiVolume;
 
+QWORD seekConversion;
+QWORD seekPosition;
+
+int bassTrackLengthLeft = 0;
+int bassTrackActualPos = 0;
+int bassSecondsCalculate = 0;
+
+int bassMilliseconds = 0;
+int bassSeconds = 0;
+int bassMinutes = 0;
+int bassHours = 0;
+int bassFrames = 0;
+QWORD bassLengthInSeconds;
+QWORD bassPosInSeconds;
+
 /* BASS PLAYER DEFINES END */
 
 /* AUDIO PLAYBACK DEFINES START */
@@ -261,7 +276,15 @@ void printBassError(const char *text)
 {
 	if(BASS_ErrorGetCode() != 0)
 	{
-		dprintf("	Error(%d): %s\n", BASS_ErrorGetCode(), text);
+		if(BASS_ErrorGetCode() != -1)
+		{
+			dprintf("	Error(%d): %s\n", BASS_ErrorGetCode(), text);
+		}
+		else
+		if(BASS_ErrorGetCode() == -1)
+		{
+			dprintf("	No errors(%d): %s\n", BASS_ErrorGetCode(), text);
+		}
 	}
 	return;
 }
@@ -513,6 +536,14 @@ void bass_stop()
 				dprintf("	BASS_WASAPI_Free\r\n");
 				return;
 			}
+			else
+			if(BASS_ErrorGetCode() == 5)
+			{
+				BASS_WASAPI_Free();
+				bass_init();
+				dprintf("	Bass Error 5 encountered, running bass_init again to restart streams\r\n");
+				return;
+			}
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
@@ -561,12 +592,14 @@ int bass_resume()
 				{
 					if(FileFormat != 3)
 					{
+						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
 					else
 					if(FileFormat == 3)
 					{
+						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
@@ -697,7 +730,7 @@ int bass_forceplay(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error occured during forceplay end()");
+			printBassError("BASS Error check on forceplay end()");
 		}
 	}
 	return 0;
@@ -779,7 +812,7 @@ int bass_play(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error occured during play end");
+			printBassError("BASS Error check on play end");
 		}
 	}
 	
@@ -954,25 +987,55 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						char trackNumber[3];
-						char trackSeconds[3];
-						char trackMilliseconds[3];
+						dprintf("      MCI_STATUS_POSITION\r\n");
 						
-						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
+						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
+						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
-						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
-						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+						bassSecondsCalculate = 0;
+						bassFrames = 0;
+						bassMilliseconds = 0;
+						bassSeconds = 0;
+						bassMinutes = 0;
+						bassHours = 0;
+						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
+						bassSecondsCalculate = bassTrackActualPos;
+						bassHours = (bassSecondsCalculate/3600);
+						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
+						if(bassMilliseconds < 0)
+						{
+							bassMilliseconds = 0;
+						}
+						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						if(bassMinutes < 0)
+						{
+							bassMinutes = 0;
+						}
+						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassSeconds < 0)
+						{
+							bassSeconds = 0;
+						}
+						bassFrames = bassSeconds*75/1000;
+						currentTrack++;
+						dprintf("     		 currentTrack: %d\r\n", currentTrack);
+						dprintf("			 bassFrames: %d\r\n", bassFrames);
+						dprintf("     		 bassMilliseconds: %d\r\n", bassMilliseconds);
+						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
+						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
+						dprintf("			 bassHours: %d\r\n", bassHours);
+						dprintf("	sent track position\r\n");
 						if (dwptrCmd & MCI_TRACK)
 						{
+							dprintf("      MCI_TRACK\r\n");
 							parms->dwTrack -= 1;
 							queriedCdTrack = parms->dwTrack;
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
 								queriedCdTrack += 1;
-								parms->dwReturn = queriedCdTrack;
+								parms->dwReturn += bassMilliseconds;
 								uintMsg = 0;
 							}
 							else
@@ -987,17 +1050,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
 							currentTrack++;
-							parms->dwReturn = currentTrack;
+							parms->dwReturn += bassMilliseconds;
 							uintMsg = 0;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
 							currentTrack++;
-							snprintf(trackNumber, 3, "%02d", currentTrack);
-							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-							snprintf(trackSeconds, 3, "%02d", bassMinutes);
-							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
 							uintMsg = 0;
 						}
 					}
@@ -1070,23 +1130,52 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						char trackNumber[3];
-						char trackSeconds[3];
-						char trackMilliseconds[3];
+						dprintf("      MCI_STATUS_POSITION\r\n");
 
-						QWORD bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-						QWORD bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-						int bassMilliseconds = (bassLengthInSeconds - bassPosInSeconds) * 1000;
-						int bassSeconds = bassLengthInSeconds - bassPosInSeconds;
-						int bassMinutes = (bassLengthInSeconds - bassPosInSeconds) / 60;
+						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
+						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
+						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+						bassSecondsCalculate = 0;
+						bassFrames = 0;
+						bassMilliseconds = 0;
+						bassSeconds = 0;
+						bassMinutes = 0;
+						bassHours = 0;
+						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
+						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
+						bassSecondsCalculate = bassTrackActualPos;
+						bassHours = (bassSecondsCalculate/3600);
+						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
+						if(bassMilliseconds < 0)
+						{
+							bassMilliseconds = 0;
+						}
+						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						if(bassMinutes < 0)
+						{
+							bassMinutes = 0;
+						}
+						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassSeconds < 0)
+						{
+							bassSeconds = 0;
+						}
+						bassFrames = bassSeconds*75/1000;
+						dprintf("     		 currentTrack: %d\r\n", currentTrack);
+						dprintf("     		 bassFrames: %d\r\n", bassFrames);
+						dprintf("     		 bassMilliseconds: %d\r\n", bassMilliseconds);
+						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
+						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
+						dprintf("     		 bassHours: %d\r\n", bassHours);
+						dprintf("	sent track position\r\n");
 						if (dwptrCmd & MCI_TRACK)
 						{
-							dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
-							dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+							dprintf("      MCI_TRACK\r\n");
 							queriedTrack = (int)(parms->dwTrack);
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
 							{
-								parms->dwReturn = queriedTrack;
+								parms->dwReturn += bassMilliseconds;
 								uintMsg = 0;
 							}
 							else
@@ -1099,16 +1188,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						else
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
-							parms->dwReturn = currentTrack;
+							parms->dwReturn += bassMilliseconds;
 							uintMsg = 0;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
-							snprintf(trackNumber, 3, "%02d", currentTrack);
-							snprintf(trackMilliseconds, 3, "%02d", bassMilliseconds);
-							snprintf(trackSeconds, 3, "%02d", bassMinutes);
-							parms->dwReturn = MCI_MAKE_TMSF(trackNumber, trackSeconds, trackMilliseconds, 0);
+							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
 							uintMsg = 0;
 						}
 					}
