@@ -466,7 +466,7 @@ int bass_init()
 		DWORD finalVolume = 0;
 		float wasapiVolume;
 		HKEY hkey;
-		if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\Cavedog Entertainment\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
+		if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\TotalM\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
 		{
 			printf("failed to open key");
 			return 1;
@@ -1049,6 +1049,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						else
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
+							dprintf("      	MCI_FORMAT_MILLISECONDS\r\n");
 							currentTrack++;
 							parms->dwReturn += bassMilliseconds;
 							uintMsg = 0;
@@ -1056,6 +1057,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
+							dprintf("      	MCI_FORMAT_TMSF\r\n");
 							currentTrack++;
 							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
 							uintMsg = 0;
@@ -1133,9 +1135,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("      MCI_STATUS_POSITION\r\n");
 
 						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+						dprintf("      	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+						dprintf("      	BASS Position in seconds: %d\r\n", bassPosInSeconds);
 						bassSecondsCalculate = 0;
 						bassFrames = 0;
 						bassMilliseconds = 0;
@@ -1162,13 +1164,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							bassSeconds = 0;
 						}
 						bassFrames = bassSeconds*75/1000;
-						dprintf("     		 currentTrack: %d\r\n", currentTrack);
-						dprintf("     		 bassFrames: %d\r\n", bassFrames);
-						dprintf("     		 bassMilliseconds: %d\r\n", bassMilliseconds);
-						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
-						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
-						dprintf("     		 bassHours: %d\r\n", bassHours);
-						dprintf("	sent track position\r\n");
+						dprintf("      		currentTrack: %d\r\n", currentTrack);
+						dprintf("      		bassFrames: %d\r\n", bassFrames);
+						dprintf("      		bassMilliseconds: %d\r\n", bassMilliseconds);
+						dprintf("      		bassSeconds: %d\r\n", bassSeconds);
+						dprintf("      		bassMinutes: %d\r\n", bassMinutes);
+						dprintf("      		bassHours: %d\r\n", bassHours);
+						dprintf("      		sent track position\r\n");
 						if (dwptrCmd & MCI_TRACK)
 						{
 							dprintf("      MCI_TRACK\r\n");
@@ -1186,17 +1188,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							}
 						}
 						else
-						if(timeFormat == MCI_FORMAT_MILLISECONDS)
-						{
-							parms->dwReturn += bassMilliseconds;
-							uintMsg = 0;
-						}
-						else
-						if(timeFormat == MCI_FORMAT_TMSF)
-						{
-							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
-							uintMsg = 0;
-						}
+						dprintf("      		MCI_FORMAT_TMSF\r\n");
+						parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
+						uintMsg = 0;
 					}
 					if (parms->dwItem == MCI_STATUS_MODE)
 					{
@@ -1249,9 +1243,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				if (dwptrCmd & MCI_SET_TIME_FORMAT)
 				{
 					dprintf("    MCI_SET_TIME_FORMAT\r\n");
-					timeFormat = parms->dwTimeFormat;
 					if (parms->dwTimeFormat == MCI_FORMAT_MILLISECONDS)
 					{
+						timeFormat = MCI_FORMAT_MILLISECONDS;
 						dprintf("      MCI_FORMAT_MILLISECONDS\r\n");
 						dwptrCmd = 0;
 						uintMsg = 0;
@@ -1259,6 +1253,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (parms->dwTimeFormat == MCI_FORMAT_TMSF)
 					{
+						timeFormat = MCI_FORMAT_TMSF;
 						dprintf("      MCI_FORMAT_TMSF\r\n");
 						dwptrCmd = 0;
 						uintMsg = 0;
@@ -1434,7 +1429,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (strstr(lpszCmd, "position"))
+		if (strstr(lpszCmd, "status cdaudio position"))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
@@ -1443,7 +1438,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
         }
-		if (sscanf(lpszCmd, "position track %d", &cTrack))
+		if (sscanf(lpszCmd, "status cdaudio position track %d", &cTrack))
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
