@@ -276,7 +276,15 @@ void printBassError(const char *text)
 {
 	if(BASS_ErrorGetCode() != 0)
 	{
-		dprintf("	Error(%d): %s\n", BASS_ErrorGetCode(), text);
+		if(BASS_ErrorGetCode() != -1)
+		{
+			dprintf("	Error(%d): %s\n", BASS_ErrorGetCode(), text);
+		}
+		else
+		if(BASS_ErrorGetCode() == -1)
+		{
+			dprintf("	No errors(%d): %s\n", BASS_ErrorGetCode(), text);
+		}
 	}
 	return;
 }
@@ -528,6 +536,14 @@ void bass_stop()
 				dprintf("	BASS_WASAPI_Free\r\n");
 				return;
 			}
+			else
+			if(BASS_ErrorGetCode() == 5)
+			{
+				BASS_WASAPI_Free();
+				bass_init();
+				dprintf("	Bass Error 5 encountered, running bass_init again to restart streams\r\n");
+				return;
+			}
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
@@ -576,12 +592,14 @@ int bass_resume()
 				{
 					if(FileFormat != 3)
 					{
+						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
 					else
 					if(FileFormat == 3)
 					{
+						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
@@ -712,7 +730,7 @@ int bass_forceplay(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error occured during forceplay end()");
+			printBassError("BASS Error check on forceplay end()");
 		}
 	}
 	return 0;
@@ -794,7 +812,7 @@ int bass_play(const char *path)
 					dprintf("	Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error occured during play end");
+			printBassError("BASS Error check on play end");
 		}
 	}
 	
