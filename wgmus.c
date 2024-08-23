@@ -1029,9 +1029,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						seekBits = 32;
 					}
 					dprintf("      		MCI_SEEK seekBits: %d\r\n", seekBits);
-					seekConversion = (MCI_TMSF_MINUTE(parms->dwTo) * 60.0f + MCI_TMSF_SECOND(parms->dwTo)) * seekSamples * seekChannels;
+					seekConversion = (MCI_TMSF_MINUTE(parms->dwTo) * 60.0f + MCI_TMSF_SECOND(parms->dwTo)) * seekSamples;
 					dprintf("      		MCI_SEEK seekConversion: %d\r\n", seekConversion);
-					seekPosition = (seekConversion * seekBits/8);
+					seekPosition = (seekConversion * seekChannels * seekBits/8 / 8);
 					dprintf("      		MCI_SEEK sent bytes to BASS for seek position: %d\r\n", seekPosition);
 					currentTrack = MCI_TMSF_TRACK(parms->dwTo);
 					uintMsg = 0;
