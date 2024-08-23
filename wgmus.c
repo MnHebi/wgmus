@@ -99,6 +99,7 @@ int samc;
 
 HSTREAM str, dec;
 BASS_CHANNELINFO cinfo;
+BASS_WASAPI_INFO winfo;
 int PlaybackFinished;
 HFX volFx;
 QWORD bassDecodePos;
@@ -107,8 +108,13 @@ QWORD bassBufferPos;
 QWORD bassFileLength;
 float bassPlaybackProgress;
 float wasapiVolume;
+double seekMinutes;
+double seekSeconds;
 QWORD seekConversion;
 QWORD seekPosition;
+DWORD seekSamples;
+DWORD seekChannels;
+DWORD seekBits;
 
 int bassTrackLengthLeft = 0;
 int bassTrackActualPos = 0;
@@ -346,8 +352,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 int bass_init()
 {
 	int a, count=0;
-	BASS_WASAPI_INFO info;
-	BASS_WASAPI_GetInfo(&info);
+	BASS_WASAPI_GetInfo(&winfo);
 	DWORD bassStarted;
 	DWORD bassDeviceCheck;
 	DWORD wasapiDeviceCheck;
@@ -394,7 +399,7 @@ int bass_init()
 		if(BASS_ErrorGetCode() == 5)
 		{
 			dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
-			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
+			dec = BASS_StreamCreate(winfo.freq, winfo.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 		}
 		return 0;
@@ -412,10 +417,10 @@ int bass_init()
 		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
 		printBassError("BASS Error Occured After BASS Wasapi Init");
 
-		BASS_WASAPI_GetInfo(&info);
-		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
+		BASS_WASAPI_GetInfo(&winfo);
+		str = BASS_Mixer_StreamCreate(winfo.freq, winfo.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
 		printBassError("BASS Error Occured After Mixer Stream Init");
-		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
+		dec = BASS_StreamCreate(winfo.freq, winfo.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
 		printBassError("BASS Error Occured After Decoder Stream Init");
 		BASS_Mixer_StreamAddChannel(str, dec, 0);
 		initDone = YES;
@@ -1000,9 +1005,34 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					dprintf("      		MCI_SEEK retrieved track minutes: %d\r\n", MCI_TMSF_MINUTE(parms->dwTo));
 					dprintf("      		MCI_SEEK retrieved track seconds: %d\r\n", MCI_TMSF_SECOND(parms->dwTo));
 					dprintf("      		MCI_SEEK retrieved track frames: %d\r\n", MCI_TMSF_FRAME(parms->dwTo));
-					seekConversion = (MCI_TMSF_MINUTE(parms->dwTo) + MCI_TMSF_SECOND(parms->dwTo)) / 1024;
-					dprintf("      		MCI_SEEK seek conversion: %d\r\n", seekConversion);
-					seekPosition = seekConversion;
+					seekSamples = winfo.freq;
+					dprintf("      		MCI_SEEK seekSamples: %d\r\n", seekSamples);
+					seekChannels = winfo.chans;
+					dprintf("      		MCI_SEEK seekChannels: %d\r\n", seekChannels);
+					if (winfo.format == BASS_WASAPI_FORMAT_8BIT)
+					{
+						seekBits = 8;
+					}
+					else
+					if (winfo.format == BASS_WASAPI_FORMAT_16BIT)
+					{
+						seekBits = 16;
+					}
+					else
+					if (winfo.format == BASS_WASAPI_FORMAT_32BIT)
+					{
+						seekBits = 32;
+					}
+					else
+					if (winfo.format == BASS_WASAPI_FORMAT_FLOAT)
+					{
+						seekBits = 32;
+					}
+					dprintf("      		MCI_SEEK seekBits: %d\r\n", seekBits);
+					seekConversion = (MCI_TMSF_MINUTE(parms->dwTo) * 60.0f + MCI_TMSF_SECOND(parms->dwTo)) * seekSamples * seekChannels;
+					dprintf("      		MCI_SEEK seekConversion: %d\r\n", seekConversion);
+					seekPosition = (seekConversion * seekBits/8);
+					dprintf("      		MCI_SEEK sent bytes to BASS for seek position: %d\r\n", seekPosition);
 					currentTrack = MCI_TMSF_TRACK(parms->dwTo);
 					uintMsg = 0;
 				}
@@ -1192,6 +1222,11 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+						bassFrames = 0;
+						bassMilliseconds = 0;
+						bassSeconds = 0;
+						bassMinutes = 0;
+						bassHours = 0;
 						bassHours = (bassPosInSeconds/3600);
 						bassMilliseconds = bassPosInSeconds*1000;
 						if(bassMilliseconds < 0)
@@ -1332,13 +1367,21 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (dwptrCmd & MCI_TO)
 					{
-						if (PlaybackMode == CD)
+						if (playState == SEEKING)
 						{
-							parms->dwTo -= 1;
+							dprintf("  Ignored MCI_TO(MCI_PLAY) since we are SEEKING\r\n");
 						}
-						dprintf("  MCI_TO(MCI_PLAY)\r\n");
-						currentTrack = MCI_TMSF_TRACK(parms->dwTo);
-						dprintf("	To value: %d\r\n", parms->dwTo);
+						else
+						if (playState != SEEKING)
+						{
+							if (PlaybackMode == CD)
+							{
+								parms->dwTo -= 1;
+							}
+							dprintf("  MCI_TO(MCI_PLAY)\r\n");
+							currentTrack = MCI_TMSF_TRACK(parms->dwTo);
+							dprintf("	To value: %d\r\n", parms->dwTo);
+						}
 					}
 					
 					dprintf("	Current track int value is: %d\r\n", currentTrack);
