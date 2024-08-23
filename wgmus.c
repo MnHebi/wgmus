@@ -718,7 +718,10 @@ int bass_forceplay(const char *path)
 					BASS_WASAPI_Start();
 					if (playState == SEEKING)
 					{
-						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+						if(seekPosition > 0)
+						{
+							BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+						}
 					}
 					playState = PLAYING;
 					timesPlayed++;
@@ -734,7 +737,10 @@ int bass_forceplay(const char *path)
 					BASS_WASAPI_Start();
 					if (playState == SEEKING)
 					{
-						BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+						if(seekPosition > 0)
+						{
+							BASS_ChannelSetPosition(dec, seekPosition, BASS_POS_BYTE);
+						}
 					}
 					playState = PLAYING;
 					timesPlayed++;
@@ -990,10 +996,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					dprintf("      MCI_TO(MCI_SEEK)\r\n");
 					currentTrack = MCI_TMSF_TRACK(parms->dwTo);
-					dprintf("      		MCI_SEEK retrieved track number: %d\r\n", currentTrack);
-					seekConversion = MCI_TMSF_MINUTE(parms->dwTo) + MCI_TMSF_SECOND(parms->dwTo) / 1024;
+					dprintf("      		MCI_SEEK retrieved track number: %d\r\n", MCI_TMSF_TRACK(parms->dwTo));
+					dprintf("      		MCI_SEEK retrieved track minutes: %d\r\n", MCI_TMSF_MINUTE(parms->dwTo));
+					dprintf("      		MCI_SEEK retrieved track seconds: %d\r\n", MCI_TMSF_SECOND(parms->dwTo));
+					dprintf("      		MCI_SEEK retrieved track frames: %d\r\n", MCI_TMSF_FRAME(parms->dwTo));
+					seekConversion = (MCI_TMSF_MINUTE(parms->dwTo) + MCI_TMSF_SECOND(parms->dwTo)) / 1024;
 					dprintf("      		MCI_SEEK seek conversion: %d\r\n", seekConversion);
 					seekPosition = seekConversion;
+					currentTrack = MCI_TMSF_TRACK(parms->dwTo);
 					uintMsg = 0;
 				}
 				
@@ -1060,23 +1070,23 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-						bassSecondsCalculate = 0;
-						bassFrames = 0;
-						bassMilliseconds = 0;
-						bassSeconds = 0;
-						bassMinutes = 0;
-						bassHours = 0;
-						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
-						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
-						bassSecondsCalculate = bassTrackActualPos;
-						bassHours = (bassSecondsCalculate/3600);
-						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
-						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						bassHours = (bassPosInSeconds/3600);
+						bassMilliseconds = bassPosInSeconds*1000;
+						if(bassMilliseconds < 0)
+						{
+							bassMilliseconds = 0;
+						}
+						bassMinutes = bassPosInSeconds/60;
 						if(bassMinutes < 0)
 						{
 							bassMinutes = 0;
 						}
-						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassMinutes == 0)
+						{
+							bassSeconds = bassPosInSeconds;
+						}
+						else
+						bassSeconds = (bassPosInSeconds -(bassMinutes*60));
 						if(bassSeconds < 0)
 						{
 							bassSeconds = 0;
@@ -1089,7 +1099,15 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
 						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
 						dprintf("			 bassHours: %d\r\n", bassHours);
-						parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, 0);
+						if (dwptrCmd & MCI_TRACK)
+						{
+							dprintf("      MCI_TRACK\r\n");
+							queriedTrack = (int)(parms->dwTrack);
+							parms->dwReturn += bassMilliseconds;
+							uintMsg = 0;
+						}
+						else
+						parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
 						dprintf("	sent track position\r\n");
 						uintMsg = 0;
 					}
@@ -1174,23 +1192,23 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
 						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
-						bassSecondsCalculate = 0;
-						bassFrames = 0;
-						bassMilliseconds = 0;
-						bassSeconds = 0;
-						bassMinutes = 0;
-						bassHours = 0;
-						bassTrackLengthLeft = bassLengthInSeconds - bassPosInSeconds;
-						bassTrackActualPos = bassLengthInSeconds - bassTrackLengthLeft;
-						bassSecondsCalculate = bassTrackActualPos;
-						bassHours = (bassSecondsCalculate/3600);
-						bassMilliseconds = (bassSecondsCalculate -(3600))*1000;
-						bassMinutes = (bassSecondsCalculate -(3600))/60;
+						bassHours = (bassPosInSeconds/3600);
+						bassMilliseconds = bassPosInSeconds*1000;
+						if(bassMilliseconds < 0)
+						{
+							bassMilliseconds = 0;
+						}
+						bassMinutes = bassPosInSeconds/60;
 						if(bassMinutes < 0)
 						{
 							bassMinutes = 0;
 						}
-						bassSeconds = (bassSecondsCalculate -(3600)-(bassMinutes*60));
+						if(bassMinutes == 0)
+						{
+							bassSeconds = bassPosInSeconds;
+						}
+						else
+						bassSeconds = (bassPosInSeconds -(bassMinutes*60));
 						if(bassSeconds < 0)
 						{
 							bassSeconds = 0;
@@ -1302,6 +1320,10 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					if (dwptrCmd & MCI_FROM)
 					{
+						if (PlaybackMode == CD)
+						{
+							parms->dwFrom -= 1;
+						}
 						notifyDevice = deviceID;
 						dprintf("  MCI_FROM(MCI_PLAY)\r\n");
 						currentTrack = MCI_TMSF_TRACK(parms->dwFrom);
@@ -1310,14 +1332,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					else
 					if (dwptrCmd & MCI_TO)
 					{
+						if (PlaybackMode == CD)
+						{
+							parms->dwTo -= 1;
+						}
 						dprintf("  MCI_TO(MCI_PLAY)\r\n");
 						currentTrack = MCI_TMSF_TRACK(parms->dwTo);
 						dprintf("	To value: %d\r\n", parms->dwTo);
-					}
-					
-					if (PlaybackMode == CD)
-					{
-						parms->dwFrom -= 1;
 					}
 					
 					dprintf("	Current track int value is: %d\r\n", currentTrack);
