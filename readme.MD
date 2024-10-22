@@ -21,7 +21,8 @@
  SPECIAL THANKS:
  FunkyFr3sh,
  Kevin Hake,
- Armoured Fish.
+ Armoured Fish,
+ Lord Aro.
  
  COPYRIGHT MENTIONS:
  ogg-winmm
