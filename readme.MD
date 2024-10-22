@@ -19,10 +19,10 @@
  SETTINGS ARE CONTROLLED VIA wgmus.ini
  
  SPECIAL THANKS:
- FunkyFr3sh,
- Kevin Hake,
- Armoured Fish,
- Lord Aro.
+ FunkyFr3sh,  
+ Kevin Hake,  
+ Armoured Fish,  
+ Lord Aro.  
  
  COPYRIGHT MENTIONS:
  ogg-winmm
