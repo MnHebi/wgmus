@@ -18,7 +18,7 @@
  
  SETTINGS ARE CONTROLLED VIA wgmus.ini
  
- SPECIAL THANKS:
+ SPECIAL THANKS:  
  FunkyFr3sh,  
  Kevin Hake,  
  Armoured Fish,  
