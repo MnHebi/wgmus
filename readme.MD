@@ -22,7 +22,7 @@
  FunkyFr3sh,  
  Kevin Hake,  
  Armoured Fish,  
- Lord Aro.  
+ LordAro.  
  
  COPYRIGHT MENTIONS:
  ogg-winmm
