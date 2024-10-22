@@ -1342,7 +1342,6 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cchReturn, HANDLE  hwndCallback)
 {
 	MCIERROR err;
-	char comparisonString[64];
 	if(TRUE) 
 	{
 		dprintf("[MCI String = %s, MCI DEVICE ID = %08X]\n", lpszCmd, hwndCallback);
@@ -1354,42 +1353,32 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		
 		int cTrack = 0;
 		
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "open cdaudio");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "open cdaudio") == 0)
 		{
 			static MCI_WAVE_OPEN_PARMS waveParms;
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "pause cdaudio");
-		if (strcmp(lpszCmd, comparisonString))
+		if (strcmp(lpszCmd, "pause cdaudio") == 0)
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PAUSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "stop cdaudio");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "stop cdaudio") == 0)
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STOP, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "close cdaudio");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "close cdaudio") == 0)
 		{
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "set cdaudio time format milliseconds");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "set cdaudio time format milliseconds") == 0)
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;	
@@ -1397,9 +1386,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "set cdaudio time format tmsf");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "set cdaudio time format tmsf") == 0)
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_TMSF;
@@ -1407,9 +1394,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "status cdaudio number of tracks");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "status cdaudio number of tracks") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
@@ -1418,7 +1403,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (sscanf(lpszCmd, "status cdaudio type track %d", &cTrack))
+		if (sscanf(lpszCmd, "status cdaudio type track %d", &cTrack) == 1)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
@@ -1428,9 +1413,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "status cdaudio mode");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "status cdaudio mode") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_MODE;
@@ -1438,9 +1421,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "status cdaudio current track");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "status cdaudio current track") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_CURRENT_TRACK;
@@ -1450,7 +1431,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			lpszCmd = "";
 			return 0;
 		}
-		if (sscanf(lpszCmd, "status cdaudio position track %d", &cTrack) == 2)
+		if (sscanf(lpszCmd, "status cdaudio position track %d", &cTrack) == 1)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
@@ -1461,9 +1442,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
         }
 		else
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "status cdaudio position");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "status cdaudio position") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
@@ -1483,7 +1462,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
 		}
 		else
-		if (sscanf(lpszCmd, "play cdaudio from %d notify", &from) == 2)
+		if (sscanf(lpszCmd, "play cdaudio from %d notify", &from) == 1)
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
@@ -1501,9 +1480,7 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			return 0;
 		}
 		else
-		memset(comparisonString, '\0', sizeof(comparisonString));
-		strcpy(comparisonString, "play cdaudio notify");
-		if (strcmp(lpszCmd, comparisonString) == 0)
+		if (strcmp(lpszCmd, "play cdaudio notify") == 0)
 		{
 			static MCI_PLAY_PARMS parms;
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_NOTIFY, (DWORD_PTR)&parms);
