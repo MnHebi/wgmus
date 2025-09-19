@@ -25,7 +25,6 @@
 #include <string.h>
 #include "patch.h"
 
-
 /* AUDIO LIBRARY INCLUDES START */
 
 #include <bass/bass.h>
@@ -144,10 +143,10 @@ int WasapiVolumeConfig(DWORD streamVol)
 	streamVol = 10000;
 	}
 	wasapiVolume = (double) streamVol * 0.99 / 10000.0;
-	dprintf("	Wasapi volume: %.2f\r\n", wasapiVolume);
+	dprintf("			Wasapi volume: %.2f\r\n", wasapiVolume);
 	
-	dprintf("	Wasapi Volume Config wasapiVolume: %.2f\r\n", wasapiVolume); 
-	dprintf("	Wasapi Volume Config streamVol: %d\r\n", streamVol); 
+	dprintf("			Wasapi Volume Config wasapiVolume: %.2f\r\n", wasapiVolume); 
+	dprintf("			Wasapi Volume Config streamVol: %d\r\n", streamVol); 
 	BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, streamVol);
 	
 	return BASS_ChannelSetAttribute(dec, BASS_ATTRIB_VOLDSP, wasapiVolume);
@@ -186,7 +185,7 @@ void wgmus_config()
 	strcat(ConfigFileNameFullPath,ConfigFileName);
 	
 	if(FileExists(ConfigFileNameFullPath)) { dprintf("	Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
-	else { dprintf("	Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
+	else { dprintf("			Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
 	
 	const char *fileFormats[] = {".wav", ".mp3", ".ogg", ".flac", ".aiff"};
 	unsigned int numFormats = sizeof(fileFormats) / sizeof(fileFormats[0]);
@@ -194,30 +193,30 @@ void wgmus_config()
 	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
 	if (FileFormat >= numFormats)
 	{
-		dprintf("    FileFormat = %d: Invalid - Defaulting to 0\r\n", FileFormat);
+		dprintf("			FileFormat = %d: Invalid - Defaulting to 0\r\n", FileFormat);
 		FileFormat = 0;
 	}
-	dprintf("    File Format is %s\r\n", fileFormats[FileFormat] + 1);
+	dprintf("			File Format is %s\r\n", fileFormats[FileFormat] + 1);
 	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
 	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
-	dprintf("	FileFormat = %d\r\n", FileFormat);
-	dprintf("	PlaybackMode = %d\r\n", PlaybackMode);
-	dprintf("	MusicFolder = %s\r\n", MusicFolder);
+	dprintf("			FileFormat = %d\r\n", FileFormat);
+	dprintf("			PlaybackMode = %d\r\n", PlaybackMode);
+	dprintf("			MusicFolder = %s\r\n", MusicFolder);
 
 	strcpy(MusicFolderFullPath, musdll_path);
 	*(strrchr(MusicFolderFullPath, '\\')+1)=0;
 	strcat(MusicFolderFullPath, MusicFolder);
-	dprintf("	Reading music files from: %s\r\n", MusicFolderFullPath);
+	dprintf("			Reading music files from: %s\r\n", MusicFolderFullPath);
 	strcpy(MusicFileFullPath, MusicFolderFullPath);
 	strcat(MusicFileFullPath, "\\");
-	dprintf("	Music folder is: %s\r\n", MusicFileFullPath);
+	dprintf("			Music folder is: %s\r\n", MusicFileFullPath);
 	strcpy(strMusicFile, "*");
 	strcat(strMusicFile, fileFormats[FileFormat]);
 	strcat(MusicFileFullPath, strMusicFile);
 	if (PlaybackMode == CD)
 	{
 		cdTracks = BASS_CD_GetTracks(0);
-		dprintf("	Number of tracks on CD is: %d\r\n", cdTracks);
+		dprintf("			Number of tracks on CD is: %d\r\n", cdTracks);
 	}
 	else
 	if (PlaybackMode == MUSICFILE)
@@ -229,13 +228,13 @@ void wgmus_config()
 			do
 			{
 				numTracks++;
-				dprintf("	Number of tracks is: %d\r\n", numTracks);
-				dprintf("	Music track being read is: %s\r\n", MusicFiles.cFileName);
+				dprintf("			Number of tracks is: %d\r\n", numTracks);
+				dprintf("			Music track being read is: %s\r\n", MusicFiles.cFileName);
 				strcpy(MusicFileStoredPath, MusicFolderFullPath);
 				strcat(MusicFileStoredPath, "\\");
 				strcat(MusicFileStoredPath, MusicFiles.cFileName);
 				snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
-				dprintf("	Music track being stored in track info is: %s\r\n", tracks[i].path);
+				dprintf("			Music track being stored in track info is: %s\r\n", tracks[i].path);
 				i++;
 			} while (FindNextFileA(findTracks, &MusicFiles) != 0);
 			FindClose(findTracks);
@@ -252,11 +251,11 @@ void wgmus_config()
 			}
 			else
 			nextTrack = 2;
-			dprintf("	Assigned First, Last, Current, and Next tracks\r\n");
-			dprintf("	First track %d\r\n", firstTrack);
-			dprintf("	Last track %d\r\n", lastTrack);
-			dprintf("	Current track %d\r\n", currentTrack);
-			dprintf("	Next track %d\r\n", nextTrack);
+			dprintf("			Assigned First, Last, Current, and Next tracks\r\n");
+			dprintf("			First track %d\r\n", firstTrack);
+			dprintf("			Last track %d\r\n", lastTrack);
+			dprintf("			Current track %d\r\n", currentTrack);
+			dprintf("			Next track %d\r\n", nextTrack);
 		}
 		else
 		if (findTracks == INVALID_HANDLE_VALUE)
@@ -278,12 +277,12 @@ void printBassError(const char *text)
 	{
 		if(BASS_ErrorGetCode() != -1)
 		{
-			dprintf("	Error(%d): %s\n", BASS_ErrorGetCode(), text);
+			dprintf("			Error(%d): %s\n", BASS_ErrorGetCode(), text);
 		}
 		else
 		if(BASS_ErrorGetCode() == -1)
 		{
-			dprintf("	No errors(%d): %s\n", BASS_ErrorGetCode(), text);
+			dprintf("			No errors(%d): %s\n", BASS_ErrorGetCode(), text);
 		}
 	}
 	return;
@@ -302,7 +301,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 	}
 	else
 	{
-		dprintf("    File length was 0; setting progress to 100%.\r\n")
+		dprintf("			File length was 0; setting progress to 100%.\r\n")
 		bassPlaybackProgress = 100.0; // Or idk if should be 0.0 Keeper
 	}
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
@@ -314,10 +313,10 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 			{
 				notify = 0;
 				changeNotify = 0;
-				dprintf("	Finished playback\r\n");
+				dprintf("			Finished playback\r\n");
 				playState = STOPPED;
-				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-				dprintf("	BASS no activity\r\n");
+				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
+				dprintf("			BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
 				return 0;
@@ -330,10 +329,10 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 			{
 				notify = 0;
 				changeNotify = 0;
-				dprintf("	Finished playback\r\n");
+				dprintf("			Finished playback\r\n");
 				playState = PLAYING;
-				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, 0x0000000);
-				dprintf("	BASS no activity\r\n");
+				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
+				dprintf("			BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
 				return 0;
@@ -359,18 +358,18 @@ int bass_init()
 	static enum INITDONE{ YES, NO } initDone = NO;
 	if (initDone == YES)
 	{
-		dprintf("    BASS already initialized, checking device status\r\n");
+		dprintf("			BASS already initialized, checking device status\r\n");
 		
 		if(bassDeviceCheck == -1)
 		{
-			dprintf("    BASS Device was not intialized, initializing\r\n");
+			dprintf("			BASS Device was not intialized, initializing\r\n");
 			playerState = OPENED;
 			playState = NOTPLAYING;
 			BASS_Init(0, 4800, 0, 0, NULL);
 		}
 		else
 		{
-			dprintf("	BASS_Init already done & device is operational, doing nothing\r\n");
+			dprintf("			BASS_Init already done & device is operational, doing nothing\r\n");
 		}
 		
 		if(wasapiDeviceCheck == -1)
@@ -378,12 +377,12 @@ int bass_init()
 			BASS_WASAPI_Free();
 			playerState = OPENED;
 			playState = NOTPLAYING;
-			dprintf("    BASS WASAPI Device was not initialized, initializing\r\n");
+			dprintf("			BASS WASAPI Device was not initialized, initializing\r\n");
 			BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
 		}
 		else
 		{
-			dprintf("	BASS_WASAPI_Init already done & device is operational, doing nothing\r\n");
+			dprintf("			BASS_WASAPI_Init already done & device is operational, doing nothing\r\n");
 		}
 		
 		if(playerState != OPENED)
@@ -394,7 +393,7 @@ int bass_init()
 		dprintf("    Checking stream status\r\n");
 		if(BASS_ErrorGetCode() == 5)
 		{
-			dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+			dprintf("			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 		}
@@ -407,32 +406,32 @@ int bass_init()
 		dprintf("	BASS_Init\r\n");
 		dprintf("    BASS Device initializing\r\n");
 		BASS_Init(0, 4800, 0, 0, NULL);
-		printBassError("BASS Error Occured After BASS Init");
+		printBassError("			BASS Error Occured After BASS Init");
 		
-		dprintf("    BASS WASAPI Device initializing\r\n");
+		dprintf("			BASS WASAPI Device initializing\r\n");
 		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
-		printBassError("BASS Error Occured After BASS Wasapi Init");
+		printBassError("			BASS Error Occured After BASS Wasapi Init");
 
 		BASS_WASAPI_GetInfo(&info);
 		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
-		printBassError("BASS Error Occured After Mixer Stream Init");
+		printBassError("			BASS Error Occured After Mixer Stream Init");
 		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
-		printBassError("BASS Error Occured After Decoder Stream Init");
+		printBassError("			BASS Error Occured After Decoder Stream Init");
 		BASS_Mixer_StreamAddChannel(str, dec, 0);
 		initDone = YES;
-		dprintf("    Checking Player and Play Status\r\n");
-		printBassError("BASS Error occured after initializing player state check");
+		dprintf("			Checking Player and Play Status\r\n");
+		printBassError("			BASS Error occured after initializing player state check");
 		switch (playerState)
 		{
 			case OPENED:
 			{
-				dprintf("    Player Status: OPENED\r\n");
+				dprintf("			Player Status: OPENED\r\n");
 				break;
 			}
 			case CLOSED:
 			{
-				dprintf("    Player Status: CLOSED\r\n");
-				dprintf("	 Player Status should not be CLOSED on INIT, SETTING OPENED\r\n");
+				dprintf("			Player Status: CLOSED\r\n");
+				dprintf("			Player Status should not be CLOSED on INIT, SETTING OPENED\r\n");
 				playerState = OPENED;
 				break;
 			}
@@ -441,24 +440,24 @@ int bass_init()
 		{
 			case PLAYING:
 			{
-				dprintf("    Play Status: PLAYING\r\n");
+				dprintf("			Play Status: PLAYING\r\n");
 				break;
 			}
 			case PAUSED:
 			{
-				dprintf("    Play Status: PAUSED\r\n");
+				dprintf("			Play Status: PAUSED\r\n");
 				break;
 			}
 			case STOPPED:
 			{
-				dprintf("    Play Status: STOPPED\r\n");
+				dprintf("			Play Status: STOPPED\r\n");
 				break;
 			}
 		}
-		dprintf("	BASS Device Number is: %d\r\n", BASS_GetDevice());
-		dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+		dprintf("			BASS Device Number is: %d\r\n", BASS_GetDevice());
+		dprintf("			BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
-		printBassError("BASS Error occured after playerState and playState check");
+		printBassError("			BASS Error occured after playerState and playState check");
 		
 		DWORD dataBuffer;
 		DWORD bufferSize = sizeof(dataBuffer);
@@ -491,7 +490,7 @@ int bass_init()
 		dprintf("	musicvol regkey size: %d\r\n", bufferSize);
 		dwVolume = dataBuffer;
 		finalVolume = dwVolume * 156.25;
-		dprintf("	BASS initial stream volume set at: %d\r\n", finalVolume);
+		dprintf("			BASS initial stream volume set at: %d\r\n", finalVolume);
 		WasapiVolumeConfig(finalVolume);
 	}
 	return 0;
@@ -501,16 +500,24 @@ int bass_pause()
 {
 	if (noFiles == 0)
 	{
-		if (BASS_ErrorGetCode() != 0)
+		if(BASS_ErrorGetCode() != -1 && BASS_ErrorGetCode() != 0)
 		{
+			BASS_WASAPI_Free();
+			bass_init();
+			dprintf("			Error during pause handling, calling BASS_WASAPI_FREE() and redoing device initialization\r\n");
 			return 0;
 		}
 		else
 		BASS_WASAPI_Stop(FALSE);
 		dprintf("	BASS_WASAPI_Stop(pause)\r\n");
-		playState = PAUSED;
+		return 0;
 	}
-	return 0;
+	else
+	if (noFiles == 1)
+	{
+		dprintf("			Pause was called when no playable music files are present\r\n");
+		return 1;
+	}
 }
 
 void bass_stop()
@@ -524,7 +531,7 @@ void bass_stop()
 				BASS_WASAPI_Stop(TRUE);
 				BASS_StreamFree(dec);
 				BASS_WASAPI_Start();
-				dprintf("	BASS_WASAPI_Stop\r\n");
+				dprintf("			BASS_WASAPI_Stop\r\n");
 				playState = STOPPED;
 				return;
 			}
@@ -533,7 +540,7 @@ void bass_stop()
 			{
 				BASS_WASAPI_Free();
 				bass_init();
-				dprintf("	BASS_WASAPI_Free\r\n");
+				dprintf("			BASS_WASAPI_Free\r\n");
 				return;
 			}
 			else
@@ -541,7 +548,7 @@ void bass_stop()
 			{
 				BASS_WASAPI_Free();
 				bass_init();
-				dprintf("	Bass Error 5 encountered, running bass_init again to restart streams\r\n");
+				dprintf("			Bass Error 5 encountered, running bass_init again to restart streams\r\n");
 				return;
 			}
 		}
@@ -549,7 +556,7 @@ void bass_stop()
 		BASS_WASAPI_Stop(TRUE);
 		BASS_StreamFree(dec);
 		BASS_WASAPI_Start();
-		dprintf("	BASS_WASAPI_Stop\r\n");
+		dprintf("			BASS_WASAPI_Stop\r\n");
 		playState = STOPPED;
 		/*timesPlayed = 0;*/
 	}
@@ -592,14 +599,14 @@ int bass_resume()
 				{
 					if(FileFormat != 3)
 					{
-						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+						dprintf("			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
 					else
 					if(FileFormat == 3)
 					{
-						dprintf("    Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+						dprintf("			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
@@ -608,7 +615,7 @@ int bass_resume()
 				BASS_WASAPI_Start();
 			}
 		}
-		dprintf("	BASS_WASAPI_Start(unpause)\r\n");
+		dprintf("			BASS_WASAPI_Start(unpause)\r\n");
 		playState = PLAYING;
 	}
 	return 0;
@@ -648,8 +655,8 @@ int bass_clear()
 				BASS_WASAPI_Start();
 			}
 		}
-		dprintf("	Track for bass_clear is: %d\r\n", currentTrack);
-		dprintf("	BASS_ChannelStop + StreamFree + ChannelPlay\r\n");
+		dprintf("			Track for bass_clear is: %d\r\n", currentTrack);
+		dprintf("			BASS_ChannelStop + StreamFree + ChannelPlay\r\n");
 	}
 	return 0;
 }
@@ -664,7 +671,7 @@ int bass_forceplay(const char *path)
 	{
 		if(playState != PAUSED)
 		{
-			printBassError("BASS Error occured during forceplay beginning()");
+			printBassError("			BASS Error occured during forceplay beginning()");
 			if(currentTrack == 0)
 			{
 				currentTrack = 2;
@@ -677,19 +684,19 @@ int bass_forceplay(const char *path)
 				{
 					if (!BASS_Init(0, 48000, 0, 0, NULL))
 					{
-						dprintf("	Bass Device Initialization FAILED\r\n");
+						dprintf("			Bass Device Initialization FAILED\r\n");
 					}
 				}
 				if(wasapiDeviceCheck == -1)
 				{
 					if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
 					{
-						dprintf("	Wasapi Device Initialization FAILED\r\n");
+						dprintf("			Wasapi Device Initialization FAILED\r\n");
 					}
 				}
 			}
-			dprintf("	bass_forceplay\r\n");
-			dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+			dprintf("			bass_forceplay\r\n");
+			dprintf("			BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
 			if (PlaybackMode == CD)
 			{
@@ -700,7 +707,7 @@ int bass_forceplay(const char *path)
 				BASS_WASAPI_Start();
 				playState = PLAYING;
 				timesPlayed++;
-				dprintf("	Begin CD Playback\r\n");
+				dprintf("			Begin CD Playback\r\n");
 			}
 			else
 			if (PlaybackMode == MUSICFILE)
@@ -715,7 +722,7 @@ int bass_forceplay(const char *path)
 					BASS_WASAPI_Start();
 					playState = PLAYING;
 					timesPlayed++;
-					dprintf("	Begin Music File Playback\r\n");
+					dprintf("			Begin Music File Playback\r\n");
 				}
 				else
 				if(FileFormat == 3)
@@ -727,10 +734,10 @@ int bass_forceplay(const char *path)
 					BASS_WASAPI_Start();
 					playState = PLAYING;
 					timesPlayed++;
-					dprintf("	Begin Music File(FLAC) Playback\r\n");
+					dprintf("			Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error check on forceplay end()");
+			printBassError("			BASS Error check on forceplay end()");
 		}
 	}
 	return 0;
@@ -746,7 +753,7 @@ int bass_play(const char *path)
 	{
 		if(playState != PAUSED)
 		{
-			printBassError("BASS Error occured during play beginning");
+			printBassError("			BASS Error occured during play beginning");
 			if(currentTrack == 0)
 			{
 				currentTrack = 2;
@@ -759,19 +766,19 @@ int bass_play(const char *path)
 				{
 					if (!BASS_Init(0, 48000, 0, 0, NULL))
 					{
-						dprintf("	Bass Device Initialization FAILED\r\n");
+						dprintf("			Bass Device Initialization FAILED\r\n");
 					}
 				}
 				if(wasapiDeviceCheck == -1)
 				{
 					if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
 					{
-						dprintf("	Wasapi Device Initialization FAILED\r\n");
+						dprintf("			Wasapi Device Initialization FAILED\r\n");
 					}
 				}
 			}
-			dprintf("	bass_play\r\n");
-			dprintf("	BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+			dprintf("			bass_play\r\n");
+			dprintf("			BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
 			if (PlaybackMode == CD)
 			{
@@ -782,7 +789,7 @@ int bass_play(const char *path)
 				BASS_WASAPI_Start();
 				playState = PLAYING;
 				timesPlayed++;
-				dprintf("	Begin CD Playback\r\n");
+				dprintf("			Begin CD Playback\r\n");
 			}
 			else
 			if (PlaybackMode == MUSICFILE)
@@ -797,7 +804,7 @@ int bass_play(const char *path)
 					BASS_WASAPI_Start();
 					playState = PLAYING;
 					timesPlayed++;
-					dprintf("	Begin Music File Playback\r\n");
+					dprintf("			Begin Music File Playback\r\n");
 				}
 				else
 				if(FileFormat == 3)
@@ -809,10 +816,10 @@ int bass_play(const char *path)
 					BASS_WASAPI_Start();
 					playState = PLAYING;
 					timesPlayed++;
-					dprintf("	Begin Music File(FLAC) Playback\r\n");
+					dprintf("			Begin Music File(FLAC) Playback\r\n");
 				}
 			}
-			printBassError("BASS Error check on play end");
+			printBassError("			BASS Error check on play end");
 		}
 	}
 	
@@ -854,8 +861,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
 
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
-		dprintf("	dll attached\r\n");
-		dprintf("	musdll_path = %s\r\n", musdll_path);
+		dprintf("dll attached\r\n");
+		dprintf("musdll_path = %s\r\n", musdll_path);
 
 		InitializeCriticalSection(&cs);
 		wgmus_config();
@@ -873,7 +880,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 {
 	if(TRUE)
 	{
-		dprintf("mciSendCommandA(deviceID=%p, uintMsg=%p, dwptrCmd=%p, dwParam=%p)\r\n", deviceID, uintMsg, dwptrCmd, dwParam);
+		dprintf("	mciSendCommandA(deviceID=%p, uintMsg=%p, dwptrCmd=%p, dwParam=%p)\r\n", deviceID, uintMsg, dwptrCmd, dwParam);
 		if (deviceID == MAGIC_DEVICEID)
 		{
 			if (uintMsg == MCI_OPEN)
@@ -882,16 +889,19 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				if(playerState != OPENED)
 				{
 					playerState = OPENED;		
-					dprintf("	Initialize BASS\r\n");
+					dprintf("		Initialize BASS\r\n");
 					bass_init();
 					uintMsg = 0;
+					return 0;
 				}
 				if(playState == PAUSED)
 				{
 					BASS_WASAPI_Start();
 					uintMsg = 0;
+					return 0;
 				}
-				return 0;
+				else
+				return 1;
 			}
 			else
 			if (uintMsg == MCI_PAUSE)
@@ -899,14 +909,27 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				if(playerState == OPENED)
 				{
 					dprintf("  MCI_PAUSE\r\n");
+					if(playState == PAUSED)
+					{
+						bass_pause();
+						BASS_WASAPI_Stop(FALSE);
+						dprintf("		playState was paused when pause was called for\r\n");
+						uintMsg = 0;
+						return 0;
+					}
+					else
 					if(playState != PAUSED)
 					{
 						bass_pause();
 						BASS_WASAPI_Stop(FALSE);
+						dprintf("		playState was not paused when pause was called for\r\n");
 						uintMsg = 0;
+						return 0;
 					}
 				}
-				return 0;
+				else
+				dprintf("  	major error while calling MCI_PAUSE\r\n");
+				return 1;
 			}
 			else
 			if (uintMsg == MCI_STOP)
@@ -915,12 +938,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					if(playState != STOPPED)
 					{
-						dprintf("  MCI_STOP\r\n");
+						dprintf("		MCI_STOP\r\n");
 						bass_stop();
 						uintMsg = 0;
+						return 0;
 					}
 				}
-				return 0;
+				else
+				return 1;
 			}
 			else
 			if (uintMsg == MCI_CLOSE)
@@ -931,17 +956,19 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					//playerState = CLOSED;
 					bass_stop();
 					BASS_WASAPI_Stop(TRUE);
-					dprintf("	Ignoring close command since TA will still send commands after it, potentially causing freezes\r\n");
+					dprintf("		Ignoring close command since TA will still send commands after it, potentially causing freezes\r\n");
 					uintMsg = 0;
+					return 0;
 				}
-				return 0;
+				else
+				return 1;
 			}
 			else
 			if (uintMsg == MCI_STATUS)
 			{
 				LPMCI_STATUS_PARMS parms = (LPVOID)dwParam;
 
-				dprintf("  MCI_STATUS\r\n");
+				dprintf("		MCI_STATUS\r\n");
 
 				parms->dwReturn = 0;
 				
@@ -949,14 +976,15 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 					{
-						dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", cdTracks);
+						dprintf("		MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", cdTracks);
 						parms->dwReturn = cdTracks;
 						uintMsg = 0;
+						return 0;
 					}
 					else
 					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
-						dprintf("      MCI_CDA_STATUS_TYPE_TRACK\r\n");
+						dprintf("		MCI_CDA_STATUS_TYPE_TRACK\r\n");
 						if((parms->dwTrack > 0) &&  (parms->dwTrack <= MAX_TRACKS))
 						{
 							parms->dwTrack -= 1;
@@ -964,8 +992,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							if (bassCdTrackLength > 0)
 							{
 								parms->dwReturn = MCI_CDA_TRACK_AUDIO;
-								dprintf("      MCI_CDA_TRACK_AUDIO\r\n");
+								dprintf("		MCI_CDA_TRACK_AUDIO\r\n");
 								uintMsg = 0;
+								return 0;
 							}
 							else
 							if (bassCdTrackLength < 0)
@@ -973,6 +1002,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								parms->dwReturn = MCI_CDA_TRACK_OTHER;
 								dprintf("      MCI_CDA_TRACK_OTHER\r\n");
 								uintMsg = 0;
+								return 0;
 							}
 						}
 					}
@@ -981,8 +1011,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					{
 						currentTrack++;
 						parms->dwReturn = currentTrack;
-						dprintf("	Sending current track: %d\r\n", currentTrack);
+						dprintf("		Sending current track: %d\r\n", currentTrack);
 						uintMsg = 0;
+						return 0;
 					}
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
@@ -990,9 +1021,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("      MCI_STATUS_POSITION\r\n");
 						
 						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-						dprintf("	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+						dprintf("		BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-						dprintf("	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+						dprintf("		BASS Position in seconds: %d\r\n", bassPosInSeconds);
 						bassFrames = 0;
 						bassMilliseconds = 0;
 						bassSeconds = 0;
@@ -1021,16 +1052,16 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						}
 						bassFrames = bassSeconds*75/1000;
 						currentTrack++;
-						dprintf("     		 currentTrack: %d\r\n", currentTrack);
-						dprintf("			 bassFrames: %d\r\n", bassFrames);
-						dprintf("     		 bassMilliseconds: %d\r\n", bassMilliseconds);
-						dprintf("     		 bassSeconds: %d\r\n", bassSeconds);
-						dprintf("     		 bassMinutes: %d\r\n", bassMinutes);
-						dprintf("			 bassHours: %d\r\n", bassHours);
-						dprintf("	sent track position\r\n");
+						dprintf("		currentTrack: %d\r\n", currentTrack);
+						dprintf("		bassFrames: %d\r\n", bassFrames);
+						dprintf("		bassMilliseconds: %d\r\n", bassMilliseconds);
+						dprintf("		bassSeconds: %d\r\n", bassSeconds);
+						dprintf("		bassMinutes: %d\r\n", bassMinutes);
+						dprintf("		bassHours: %d\r\n", bassHours);
+						dprintf("		sent track position\r\n");
 						if (dwptrCmd & MCI_TRACK)
 						{
-							dprintf("      MCI_TRACK\r\n");
+							dprintf("		MCI_TRACK\r\n");
 							parms->dwTrack -= 1;
 							queriedCdTrack = parms->dwTrack;
 							if(timeFormat == MCI_FORMAT_MILLISECONDS)
@@ -1038,6 +1069,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								queriedCdTrack += 1;
 								parms->dwReturn += bassMilliseconds;
 								uintMsg = 0;
+								return 0;
 							}
 							else
 							if(timeFormat == MCI_FORMAT_TMSF)
@@ -1045,23 +1077,26 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								queriedCdTrack += 1;
 								parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
 								uintMsg = 0;
+								return 0;
 							}
 						}
 						else
 						if(timeFormat == MCI_FORMAT_MILLISECONDS)
 						{
-							dprintf("      	MCI_FORMAT_MILLISECONDS\r\n");
+							dprintf("		MCI_FORMAT_MILLISECONDS\r\n");
 							currentTrack++;
 							parms->dwReturn += bassMilliseconds;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(timeFormat == MCI_FORMAT_TMSF)
 						{
-							dprintf("      	MCI_FORMAT_TMSF\r\n");
+							dprintf("		MCI_FORMAT_TMSF\r\n");
 							currentTrack++;
 							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
 							uintMsg = 0;
+							return 0;
 						}
 					}
 					if (parms->dwItem == MCI_STATUS_MODE)
@@ -1069,37 +1104,42 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("      MCI_STATUS_MODE\r\n");
 						if(playerState == OPENED && playState == NOTPLAYING)
 						{
-							dprintf("        we are open\r\n");
+							dprintf("		we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == CLOSED && playState == NOTPLAYING)
 						{
-							dprintf("        player not ready\r\n");
+							dprintf("		player not ready\r\n");
 							parms->dwReturn = MCI_MODE_NOT_READY;
 							uintMsg = 0;
+							return 0;
 						}							
 						else
 						if(playerState == OPENED && playState == PAUSED)
 						{
-							dprintf("        we are paused\r\n");
+							dprintf("		we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == OPENED && playState == STOPPED)
 						{
-							dprintf("        we are stopped\r\n");
+							dprintf("		we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == OPENED && playState == PLAYING)
 						{
-							dprintf("        we are playing\r\n");
+							dprintf("		we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
 							uintMsg = 0;
+							return 0;
 						}
 					}
 					return 0;
@@ -1109,31 +1149,34 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 					{
-						dprintf("      MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", numTracks);
+						dprintf("		MCI_STATUS_NUMBER_OF_TRACKS %d\r\n", numTracks);
 						parms->dwReturn = numTracks;
 						uintMsg = 0;
+						return 0;
 					}
 					else
 					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
 					{
-						dprintf("      MCI_CDA_STATUS_TYPE_TRACK MCI_CDA_TRACK_OTHER\r\n");
+						dprintf("		MCI_CDA_STATUS_TYPE_TRACK MCI_CDA_TRACK_OTHER\r\n");
 						if((parms->dwTrack == 1) &&  (parms->dwTrack < MAX_TRACKS))
 						{
 							parms->dwReturn = MCI_CDA_TRACK_OTHER;
 							uintMsg = 0;
+							return 0;
 						}
 					}
 					else
 					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
 					{
-						dprintf("	Sending current track: %d\r\n", currentTrack);
+						dprintf("		Sending current track: %d\r\n", currentTrack);
 						parms->dwReturn = currentTrack;
 						uintMsg = 0;
+						return 0;
 					}
 					else
 					if (parms->dwItem == MCI_STATUS_POSITION)
 					{
-						dprintf("      MCI_STATUS_POSITION\r\n");
+						dprintf("		MCI_STATUS_POSITION\r\n");
 						if (dwptrCmd & MCI_TRACK)
 						{
 							nextTrack = currentTrack + 1;
@@ -1144,13 +1187,14 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							dprintf("      		sent next track %d starting position\r\n", nextTrack);
 							parms->dwReturn = nextTrack;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						{
 							bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-							dprintf("      	BASS Length in seconds: %d\r\n", bassLengthInSeconds);
+							dprintf("		BASS Length in seconds: %d\r\n", bassLengthInSeconds);
 							bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-							dprintf("      	BASS Position in seconds: %d\r\n", bassPosInSeconds);
+							dprintf("		BASS Position in seconds: %d\r\n", bassPosInSeconds);
 							bassFrames = 0;
 							bassMilliseconds = 0;
 							bassSeconds = 0;
@@ -1178,15 +1222,16 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 								bassSeconds = 0;
 							}
 							bassFrames = bassSeconds*75/1000;
-							dprintf("      		currentTrack: %d\r\n", currentTrack);
-							dprintf("      		bassFrames: %d\r\n", bassFrames);
-							dprintf("      		bassMilliseconds: %d\r\n", bassMilliseconds);
-							dprintf("      		bassSeconds: %d\r\n", bassSeconds);
-							dprintf("      		bassMinutes: %d\r\n", bassMinutes);
-							dprintf("      		bassHours: %d\r\n", bassHours);
+							dprintf("		currentTrack: %d\r\n", currentTrack);
+							dprintf("		bassFrames: %d\r\n", bassFrames);
+							dprintf("		bassMilliseconds: %d\r\n", bassMilliseconds);
+							dprintf("		bassSeconds: %d\r\n", bassSeconds);
+							dprintf("		bassMinutes: %d\r\n", bassMinutes);
+							dprintf("		bassHours: %d\r\n", bassHours);
 							parms->dwReturn = currentTrack;
-							dprintf("      		sent track position\r\n");
+							dprintf("		sent track position\r\n");
 							uintMsg = 0;
+							return 0;
 						}
 					}
 					if (parms->dwItem == MCI_STATUS_MODE)
@@ -1194,37 +1239,42 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						dprintf("      MCI_STATUS_MODE\r\n");
 						if(playerState == OPENED && playState == NOTPLAYING)
 						{
-							dprintf("        we are open\r\n");
+							dprintf("		we are open\r\n");
 							parms->dwReturn = MCI_MODE_OPEN;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == CLOSED && playState == NOTPLAYING)
 						{
-							dprintf("        player not ready\r\n");
+							dprintf("		player not ready\r\n");
 							parms->dwReturn = MCI_MODE_NOT_READY;
 							uintMsg = 0;
+							return 0;
 						}							
 						else
 						if(playerState == OPENED && playState == PAUSED)
 						{
-							dprintf("        we are paused\r\n");
+							dprintf("		we are paused\r\n");
 							parms->dwReturn = MCI_MODE_PAUSE;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == OPENED && playState == STOPPED)
 						{
-							dprintf("        we are stopped\r\n");
+							dprintf("		we are stopped\r\n");
 							parms->dwReturn = MCI_MODE_STOP;
 							uintMsg = 0;
+							return 0;
 						}
 						else
 						if(playerState == OPENED && playState == PLAYING)
 						{
-							dprintf("        we are playing\r\n");
+							dprintf("		we are playing\r\n");
 							parms->dwReturn = MCI_MODE_PLAY;
 							uintMsg = 0;
+							return 0;
 						}
 					}
 					return 0;
@@ -1235,25 +1285,27 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			{
 				LPMCI_SET_PARMS parms = (LPVOID)dwParam;
 			
-				dprintf("  MCI_SET\r\n");
+				dprintf("		MCI_SET\r\n");
 			
 				if (dwptrCmd & MCI_SET_TIME_FORMAT)
 				{
-					dprintf("    MCI_SET_TIME_FORMAT\r\n");
+					dprintf("		MCI_SET_TIME_FORMAT\r\n");
 					if (parms->dwTimeFormat == MCI_FORMAT_MILLISECONDS)
 					{
 						timeFormat = MCI_FORMAT_MILLISECONDS;
-						dprintf("      MCI_FORMAT_MILLISECONDS\r\n");
+						dprintf("		MCI_FORMAT_MILLISECONDS\r\n");
 						dwptrCmd = 0;
 						uintMsg = 0;
+						return 0;
 					}
 					else
 					if (parms->dwTimeFormat == MCI_FORMAT_TMSF)
 					{
 						timeFormat = MCI_FORMAT_TMSF;
-						dprintf("      MCI_FORMAT_TMSF\r\n");
+						dprintf("		MCI_FORMAT_TMSF\r\n");
 						dwptrCmd = 0;
 						uintMsg = 0;
+						return 0;
 					}
 				}
 				return 0;
@@ -1269,7 +1321,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				{
 					if (dwptrCmd & MCI_NOTIFY)
 					{
-						dprintf("	bass_resume from paused via notify\r\n");
+						dprintf("		bass_resume from paused via notify\r\n");
 						dwptrCmd = 0;
 						uintMsg = 0;
 						bass_resume();
@@ -1281,12 +1333,12 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					if (dwptrCmd & MCI_FROM)
 					{
 						notifyDevice = deviceID;
-						dprintf("  MCI_FROM\r\n");
+						dprintf("		MCI_FROM\r\n");
 					}
 					else
 					if (dwptrCmd & MCI_TO)
 					{
-						dprintf("  MCI_TO\r\n");
+						dprintf("		MCI_TO\r\n");
 					}
 					
 					if (PlaybackMode == CD)
@@ -1296,8 +1348,8 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 					
 					currentTrack = (int)(parms->dwFrom);
 					nextTrack = (int)(parms->dwTo);
-					dprintf("	From value: %d\r\n", parms->dwFrom);
-					dprintf("	Current track int value is: %d\r\n", currentTrack);
+					dprintf("		From value: %d\r\n", parms->dwFrom);
+					dprintf("		Current track int value is: %d\r\n", currentTrack);
 					
 
 					if (timesPlayed > 0)
@@ -1322,7 +1374,7 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 				else
 				if (dwptrCmd & MCI_NOTIFY)
 				{
-					dprintf("	BASS_ChannelPlay from paused via notify\r\n");
+					dprintf("		BASS_ChannelPlay from paused via notify\r\n");
 					bass_resume();
 					dwptrCmd = 0;
 					uintMsg = 0;
@@ -1350,59 +1402,60 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		
 		if (strcmp(lpszCmd, "open cdaudio") == 0)
 		{
+			dprintf("mciSendStringA called for MCI_OPEN\r\n");
 			static MCI_WAVE_OPEN_PARMS waveParms;
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_OPEN, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_OPEN\r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "pause cdaudio") == 0)
 		{
+			dprintf("mciSendStringA called for MCI_PAUSE\r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PAUSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_PAUSE\r\n");
+			playState = PAUSED;
 			return 0;
 		}
 		if (strcmp(lpszCmd, "stop cdaudio") == 0)
 		{
+			dprintf("mciSendStringA called for MCI_STOP\r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STOP, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STOP\r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "close cdaudio") == 0)
 		{
+			dprintf("mciSendStringA called for MCI_CLOSE\r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_CLOSE, 0, (DWORD_PTR)NULL);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_CLOSE\r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "set cdaudio time format milliseconds") == 0)
 		{
 			static MCI_SET_PARMS parms;
-			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;	
+			parms.dwTimeFormat = MCI_FORMAT_MILLISECONDS;
+			dprintf("mciSendStringA called for MCI_SET with MCI_SET_TIME_FORMAT MCI_FORMAT_MILLISECONDS\r\n");			
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_SET with MCI_SET_TIME_FORMAT MCI_FORMAT_MILLISECONDS\r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "set cdaudio time format tmsf") == 0)
 		{
 			static MCI_SET_PARMS parms;
 			parms.dwTimeFormat = MCI_FORMAT_TMSF;
+			dprintf("mciSendStringA called for MCI_SET with MCI_SET_TIME_FORMAT MCI_FORMAT_TMSF\r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_SET with MCI_SET_TIME_FORMAT MCI_FORMAT_TMSF\r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "status cdaudio number of tracks") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_NUMBER_OF_TRACKS;
+			dprintf("mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM number of tracks \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", numTracks);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM number of tracks \r\n");
 			return 0;
 		}
 		if (sscanf(lpszCmd, "status cdaudio type track %d", &cTrack) == 1)
@@ -1410,19 +1463,19 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_CDA_STATUS_TYPE_TRACK;
 			parms.dwTrack = cTrack;
+			dprintf("mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM|MCI_TRACK \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM|MCI_TRACK \r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "status cdaudio mode") == 0)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_MODE;
+			dprintf("mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM|MCI_STATUS_MODE \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_STATUS_MODE, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS with MCI_STATUS_ITEM|MCI_STATUS_MODE \r\n");
 			return 0;
 		}
 		if (strcmp(lpszCmd, "status cdaudio current track") == 0)
@@ -1430,21 +1483,32 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_CURRENT_TRACK;
 			parms.dwTrack = currentTrack;
+			dprintf("mciSendStringA called for MCI_STATUS parms MCI_STATUS_CURRENT_TRACK with MCI_STATUS_ITEM|MCI_TRACK \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS parms MCI_STATUS_CURRENT_TRACK with MCI_STATUS_ITEM|MCI_TRACK \r\n");
 			return 0;
 		}
+		if (sscanf(lpszCmd, "status cdaudio length track %d", &cTrack) == 1)
+		{
+			static MCI_STATUS_PARMS parms;
+			parms.dwItem = MCI_STATUS_LENGTH;
+			parms.dwTrack = cTrack;
+			dprintf("mciSendStringA called for MCI_STATUS parms MCI_STATUS_LENGTH with MCI_STATUS_ITEM|MCI_TRACK(track number %) \r\n");
+			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
+			sprintf(lpszRetStr, "%d", parms.dwReturn);
+			lpszCmd = "";
+			return 0;
+        }
 		if (sscanf(lpszCmd, "status cdaudio position track %d", &cTrack) == 1)
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
 			parms.dwTrack = cTrack;
+			dprintf("mciSendStringA called for MCI_STATUS parms MCI_STATUS_POSITION with MCI_STATUS_ITEM|MCI_TRACK(track number %) \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM|MCI_TRACK, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS parms MCI_STATUS_POSITION with MCI_STATUS_ITEM|MCI_TRACK(track number %) \r\n");
 			return 0;
         }
 		else
@@ -1452,10 +1516,10 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_STATUS_PARMS parms;
 			parms.dwItem = MCI_STATUS_POSITION;
+			dprintf("mciSendStringA called for MCI_STATUS parms MCI_STATUS_POSITION with MCI_STATUS_ITEM \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_STATUS, MCI_STATUS_ITEM, (DWORD_PTR)&parms);
 			sprintf(lpszRetStr, "%d", parms.dwReturn);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_STATUS parms MCI_STATUS_POSITION with MCI_STATUS_ITEM \r\n");
 			return 0;
         }
 		int from = -1, to = -1;
@@ -1464,9 +1528,9 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
 			parms.dwTo = to;
+			dprintf("mciSendStringA called for MCI_PLAY with MCI_FROM|MCI_TO|MCI_NOTIFY \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM|MCI_TO|MCI_NOTIFY, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_PLAY with MCI_FROM|MCI_TO|MCI_NOTIFY \r\n");
 			return 0;
 		}
 		else
@@ -1474,9 +1538,9 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
+			dprintf("mciSendStringA called for MCI_PLAY with MCI_FROM|MCI_NOTIFY \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM|MCI_NOTIFY, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_PLAY with MCI_FROM|MCI_NOTIFY \r\n");
 			return 0;
 		}
 		else
@@ -1484,15 +1548,16 @@ MCIERROR WINAPI wgmus_mciSendStringA(LPCTSTR lpszCmd, LPTSTR lpszRetStr, UINT cc
 		{
 			static MCI_PLAY_PARMS parms;
 			parms.dwFrom = from;
+			dprintf("mciSendStringA called for MCI_PLAY with MCI_FROM \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_FROM, (DWORD_PTR)&parms);
 			lpszCmd = "";
-			dprintf("		mciSendStringA called for MCI_PLAY with MCI_FROM \r\n");
 			return 0;
 		}
 		else
 		if (strcmp(lpszCmd, "play cdaudio notify") == 0)
 		{
 			static MCI_PLAY_PARMS parms;
+			dprintf("mciSendStringA called for MCI_PLAY with MCI_NOTIFY \r\n");
 			wgmus_mciSendCommandA(MAGIC_DEVICEID, MCI_PLAY, MCI_NOTIFY, (DWORD_PTR)&parms);
 			lpszCmd = "";
 			return 0;
