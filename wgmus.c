@@ -49,21 +49,46 @@ static const char* log_level_str[] = { "DEBUG","INFO","WARN","ERROR" };
 static CRITICAL_SECTION log_cs;
 static log_level_t g_log_level = LOG_INFO;
 static FILE *fh = NULL;
+static volatile LONG g_log_ready = 0;  // 0 = not ready, 1 = ready
+
 static void log_msg(log_level_t level, const char *fmt, ...)
 {
     if (!fh) return;
     if (level < g_log_level) return;
+
+    // If logger not fully ready, do a minimal, lockless write (best effort).
+    if (InterlockedCompareExchange(&g_log_ready, 1, 1) == 0) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(fh, fmt, args);
+        va_end(args);
+        fputc('\n', fh);
+        fflush(fh);
+        return;
+    }
+
     EnterCriticalSection(&log_cs);
+
     SYSTEMTIME st; GetLocalTime(&st);
     fprintf(fh, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] ",
         st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
     fprintf(fh, "[%s] ", log_level_str[level]);
-    va_list args; va_start(args, fmt); vfprintf(fh, fmt, args); va_end(args);
-    fprintf(fh, "\n"); fflush(fh);
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(fh, fmt, args);
+    va_end(args);
+
+    fputc('\n', fh);
+    fflush(fh);
+
     LeaveCriticalSection(&log_cs);
 }
-static const char* bass_error_string(int code){
-    switch(code){
+
+static const char* bass_error_string(int code)
+{
+    switch(code)
+	{
         case 0: return "BASS_OK (no error)";
         case -1: return "BASS_NO_ERROR_CHECKED";
         case BASS_ERROR_MEM: return "BASS_ERROR_MEM"; case BASS_ERROR_FILEOPEN: return "BASS_ERROR_FILEOPEN";
@@ -84,7 +109,9 @@ static const char* bass_error_string(int code){
         case BASS_ERROR_SPEAKER: return "BASS_ERROR_SPEAKER"; case BASS_ERROR_VERSION: return "BASS_ERROR_VERSION";
         case BASS_ERROR_CODEC: return "BASS_ERROR_CODEC"; case BASS_ERROR_ENDED: return "BASS_ERROR_ENDED";
         case BASS_ERROR_BUSY: return "BASS_ERROR_BUSY"; default: return "Unknown BASS error";
-    }}
+    }
+}
+
 static int check_bass_error(const char *ctx){ int e=BASS_ErrorGetCode(); if(!e) return 0; log_msg(LOG_ERROR, "%s → %s (code=%d)", ctx, bass_error_string(e), e); return e; }
 
 #define MAGIC_DEVICEID 0xBEEF
