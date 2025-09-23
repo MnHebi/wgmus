@@ -219,6 +219,7 @@ int noFiles = 0;
 
 /* AUDIO PLAYBACK DEFINES END */
 
+/*
 static void init_wgmus(HINSTANCE hinstDLL)
 {
     char logPath[MAX_PATH];
@@ -242,6 +243,7 @@ static void init_wgmus(HINSTANCE hinstDLL)
     load_log_config(hinstDLL);  // defined below
     log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
 }
+*/
 
 int WasapiVolumeConfig(DWORD streamVol)
 {
@@ -260,11 +262,58 @@ int WasapiVolumeConfig(DWORD streamVol)
 }
 
  
-int sortstring(const void* a, const void* b)
-{
-    const char *ia = (const char *)a;
-    const char *ib = (const char *)b;
-    return strcmp(ia, ib);
+/* Compare two C strings "naturally" (numbers by value, not digits) */
+static int natcmp_ci(const char *a, const char *b) {
+    unsigned char ca, cb;
+    for (;;) {
+        ca = (unsigned char)*a; cb = (unsigned char)*b;
+        // both digits -> compare the full number
+        if (ca >= '0' && ca <= '9' && cb >= '0' && cb <= '9') {
+            // skip leading zeros
+            const char *pa = a, *pb = b;
+            while (*pa == '0') ++pa;
+            while (*pb == '0') ++pb;
+
+            // parse numeric value (use unsigned long long to be safe)
+            unsigned long long va = 0, vb = 0;
+            while (*pa >= '0' && *pa <= '9') { va = va*10 + (unsigned)(*pa - '0'); ++pa; }
+            while (*pb >= '0' && *pb <= '9') { vb = vb*10 + (unsigned)(*pb - '0'); ++pb; }
+
+            if (va < vb) return -1;
+            if (va > vb) return 1;
+
+            // same numeric value: shorter digit run wins (e.g., "003" vs "0003")
+            int lena = (int)(pa - a), lenb = (int)(pb - b);
+            if (lena != lenb) return (lena < lenb) ? -1 : 1;
+
+            // advance both past the number and continue
+            a = pa; b = pb; 
+            continue;
+        }
+
+        // case-insensitive char compare
+        if (ca >= 'A' && ca <= 'Z') ca += 'a' - 'A';
+        if (cb >= 'A' && cb <= 'Z') cb += 'a' - 'A';
+        if (ca != cb) return (ca < cb) ? -1 : 1;
+
+        if (ca == 0) return 0; // both ended
+        ++a; ++b;
+    }
+}
+
+/* Get base filename (no directory) from a full path */
+static const char* basename_ptr(const char *path) {
+    const char *s = strrchr(path, '\\');
+    if (!s) s = strrchr(path, '/');
+    return s ? (s + 1) : path;
+}
+
+/* Comparator for your tracks[] (sort by filename, naturally) */
+static int cmp_track_natural(const void *pa, const void *pb) {
+    const struct { char path[MAX_PATH]; } *A = pa, *B = pb;
+    const char *na = basename_ptr(A->path);
+    const char *nb = basename_ptr(B->path);
+    return natcmp_ci(na, nb);
 }
 
 BOOL FileExists(LPCTSTR szPath)
@@ -348,14 +397,21 @@ void wgmus_config(HINSTANCE hinstDLL)
             noFiles = 0;
         }
 
-        if (numTracks > 0) {
+        if (numTracks > 0) 
+		{
             firstTrack   = FIRST_TRACK_INDEX;
             lastTrack    = FIRST_TRACK_INDEX + numTracks - 1;
+			if (numTracks > 1)
+			{
+				qsort(&tracks[FIRST_TRACK_INDEX], (size_t)numTracks, sizeof(tracks[0]), cmp_track_natural);
+			}
             currentTrack = FIRST_TRACK_INDEX;
             nextTrack    = (numTracks > 1) ? (FIRST_TRACK_INDEX + 1) : FIRST_TRACK_INDEX;
             log_msg(LOG_INFO, "Assigned tracks → first=%d last=%d current=%d next=%d (count=%d)",
                     firstTrack, lastTrack, currentTrack, nextTrack, numTracks);
-        } else {
+        } 
+		else 
+		{
             currentTrack = nextTrack = lastTrack = 0;
             noFiles = 1;
             log_msg(LOG_WARN, "No tracks found in %s", MusicFolderFullPath);
@@ -609,7 +665,7 @@ int bass_pause()
 		log_msg(LOG_DEBUG, "			Pause was called when no playable music files are present\r\n");
 		return 1;
 	}
-        return 0;
+    return 0;
 }
 
 void bass_stop()
@@ -969,6 +1025,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
 		log_msg(LOG_DEBUG, "dll attached\r\n");
 		log_msg(LOG_DEBUG, "musdll_path = %s\r\n", musdll_path);
+		InitializeCriticalSection(&cs);
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)
