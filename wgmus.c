@@ -33,25 +33,35 @@
 #include <bass/bassmix.h>
 #include <bass/basswasapi.h>
 
+/* PROJECT LIBRARIES START */
+
+#include "wgmus_ini_helpers.h"
+
+/* PROJECT LIBRARIES END */
+
 /* ---------- Forward declarations ---------- */
 static int open_track_stream_table(int track, const char *path);
 static void fade_in_current(DWORD ms);
 static void fade_out_current(DWORD ms);
 static void CALLBACK OnEnd(HSYNC h, DWORD chan, DWORD data, void *user);
+
+void init_logger_paths(HINSTANCE hinstDLL);  // opens wgmus.log next to DLL, sets _IONBF, initializes log_cs, sets g_log_ready=1
+void load_log_config(HINSTANCE hinstDLL);    // reads wgmus.ini next to DLL, sets g_log_level
+void log_msg(log_level_t level, const char *fmt, ...);
 /* ------------------------------------------ */
 
 /* AUDIO LIBRARY INCLUDES END */
 
 
 /* ====================== LOGGER ====================== */
-typedef enum { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR } log_level_t;
-static const char* log_level_str[] = { "DEBUG","INFO","WARN","ERROR" };
-static CRITICAL_SECTION log_cs;
-static log_level_t g_log_level = LOG_INFO;
-static FILE *fh = NULL;
-static volatile LONG g_log_ready = 0;  // 0 = not ready, 1 = ready
+//typedef enum { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR } log_level_t;
+const char* log_level_str[] = { "DEBUG","INFO","WARN","ERROR" };
+CRITICAL_SECTION log_cs;
+log_level_t g_log_level = LOG_INFO;
+FILE *fh = NULL;
+volatile LONG g_log_ready = 0;
 
-static void log_msg(log_level_t level, const char *fmt, ...)
+void log_msg(log_level_t level, const char *fmt, ...)
 {
     if (!fh) return;
     if (level < g_log_level) return;
@@ -117,10 +127,6 @@ static int check_bass_error(const char *ctx){ int e=BASS_ErrorGetCode(); if(!e) 
 #define MAGIC_DEVICEID 0xBEEF
 #define FIRST_TRACK_INDEX 2
 #define MAX_TRACKS 99
-
-/* PROJECT LIBRARIES START */
-
-/* PROJECT LIBRARIES END */
 
 CRITICAL_SECTION cs;
 
@@ -213,6 +219,30 @@ int noFiles = 0;
 
 /* AUDIO PLAYBACK DEFINES END */
 
+static void init_wgmus(HINSTANCE hinstDLL)
+{
+    char logPath[MAX_PATH];
+    path_next_to_dll(hinstDLL, "wgmus.log", logPath, sizeof logPath);
+
+    fopen_s(&fh, logPath, "w");
+    if (fh) {
+        // Unbuffered so even early crashes leave bytes on disk
+        setvbuf(fh, NULL, _IONBF, 0);
+        InitializeCriticalSection(&log_cs);
+        InterlockedExchange(&g_log_ready, 1);
+
+        // Guaranteed first bytes (not filtered by log level)
+        fprintf(fh, "[logger] started at %s\n", logPath);
+        fflush(fh);
+    }
+
+    InitializeCriticalSection(&cs);
+
+    // Load INI (see section 3) and then announce final level
+    load_log_config(hinstDLL);  // defined below
+    log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
+}
+
 int WasapiVolumeConfig(DWORD streamVol)
 {
 	if (streamVol >10000) 
@@ -245,107 +275,92 @@ BOOL FileExists(LPCTSTR szPath)
          !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
  
-/* Get audio settings from <exe dir>/wgmmus.ini, set in global variables */
-void wgmus_config()
+/* Get audio settings from <exe dir>/wgmus.ini, set in global variables */
+void wgmus_config(HINSTANCE hinstDLL)
 {
-	TCHAR ConfigFileNameFullPath[MAX_PATH];
-	char *last = strrchr(musdll_path, '\\');
-	if (last)
-	{
-		*last = '\0';
-	}
-	strncat(musdll_path, "\\", sizeof musdll_path - 1);
-	strcpy(ConfigFileNameFullPath, musdll_path);
-	LPCSTR ConfigFileName = "wgmus.ini";
+    // --- get DLL directory without touching musdll_path ---
+    char dllDir[MAX_PATH];
+    {
+        char tmp[MAX_PATH] = {0};
+        GetModuleFileNameA(hinstDLL, tmp, sizeof tmp);
+        char *slash = strrchr(tmp, '\\');
+        if (slash) *slash = '\0';
+        snprintf(dllDir, sizeof dllDir, "%s", tmp);
+    }
 
-	*(strrchr(ConfigFileNameFullPath, '\\')+1)=0;
-	strcat(ConfigFileNameFullPath,ConfigFileName);
-	
-	if(FileExists(ConfigFileNameFullPath)) { log_msg(LOG_DEBUG, "	Reading audio settings from: %s\r\n", ConfigFileNameFullPath); }
-	else { log_msg(LOG_DEBUG, "			Audio settings file %s does not exist.\r\n", ConfigFileNameFullPath); }
-	
-	const char *fileFormats[] = {".wav", ".mp3", ".ogg", ".flac", ".aiff"};
-	unsigned int numFormats = sizeof(fileFormats) / sizeof(fileFormats[0]);
-	
-	FileFormat = GetPrivateProfileInt("Settings", "FileFormat", 0, ConfigFileNameFullPath);
-	if (FileFormat >= numFormats)
-	{
-		log_msg(LOG_DEBUG, "			FileFormat = %d: Invalid - Defaulting to 0\r\n", FileFormat);
-		FileFormat = 0;
-	}
-	log_msg(LOG_DEBUG, "			File Format is %s\r\n", fileFormats[FileFormat] + 1);
-	PlaybackMode = GetPrivateProfileInt("Settings", "PlaybackMode", 0, ConfigFileNameFullPath);
-	GetPrivateProfileString("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, ConfigFileNameFullPath);
-	log_msg(LOG_DEBUG, "			FileFormat = %d\r\n", FileFormat);
-	log_msg(LOG_DEBUG, "			PlaybackMode = %d\r\n", PlaybackMode);
-	log_msg(LOG_DEBUG, "			MusicFolder = %s\r\n", MusicFolder);
+    // --- INI path next to DLL ---
+    char iniPath[MAX_PATH];
+    snprintf(iniPath, sizeof iniPath, "%s\\wgmus.ini", dllDir);
 
-	strcpy(MusicFolderFullPath, musdll_path);
-	*(strrchr(MusicFolderFullPath, '\\')+1)=0;
-	strcat(MusicFolderFullPath, MusicFolder);
-	log_msg(LOG_DEBUG, "			Reading music files from: %s\r\n", MusicFolderFullPath);
-	strcpy(MusicFileFullPath, MusicFolderFullPath);
-	strcat(MusicFileFullPath, "\\");
-	log_msg(LOG_DEBUG, "			Music folder is: %s\r\n", MusicFileFullPath);
-	strcpy(strMusicFile, "*");
-	strcat(strMusicFile, fileFormats[FileFormat]);
-	strcat(MusicFileFullPath, strMusicFile);
-	if (PlaybackMode == CD)
-	{
-		cdTracks = BASS_CD_GetTracks(0);
-		log_msg(LOG_DEBUG, "			Number of tracks on CD is: %d\r\n", cdTracks);
-	}
-	else
-	if (PlaybackMode == MUSICFILE)
-	{
-		findTracks = FindFirstFileA(MusicFileFullPath, &MusicFiles);
-		int i = 2;
-		if (findTracks != INVALID_HANDLE_VALUE)
-		{
-			do
-			{
-				numTracks++;
-				log_msg(LOG_DEBUG, "			Number of tracks is: %d\r\n", numTracks);
-				log_msg(LOG_DEBUG, "			Music track being read is: %s\r\n", MusicFiles.cFileName);
-				strcpy(MusicFileStoredPath, MusicFolderFullPath);
-				strcat(MusicFileStoredPath, "\\");
-				strcat(MusicFileStoredPath, MusicFiles.cFileName);
-				snprintf(tracks[i].path, sizeof tracks[i].path, MusicFileStoredPath, MusicFolderFullPath, i);
-				log_msg(LOG_DEBUG, "			Music track being stored in track info is: %s\r\n", tracks[i].path);
-				i++;
-			} while (FindNextFileA(findTracks, &MusicFiles) != 0);
-			FindClose(findTracks);
-			noFiles = 0;
-		}
-		if (numTracks > 0)
-		{
-			firstTrack = 2;
-			lastTrack = numTracks += 1;
-			currentTrack = FIRST_TRACK_INDEX;
-			if (numTracks > 1)
-			{
-				nextTrack = 3;
-			}
-			else
-			nextTrack = 2;
-			log_msg(LOG_DEBUG, "			Assigned First, Last, Current, and Next tracks\r\n");
-			log_msg(LOG_DEBUG, "			First track %d\r\n", firstTrack);
-			log_msg(LOG_DEBUG, "			Last track %d\r\n", lastTrack);
-			log_msg(LOG_DEBUG, "			Current track %d\r\n", currentTrack);
-			log_msg(LOG_DEBUG, "			Next track %d\r\n", nextTrack);
-		}
-		else
-		if (findTracks == INVALID_HANDLE_VALUE)
-		{
-			currentTrack = 0;
-			nextTrack = 0;
-			lastTrack = 0;
-			noFiles = 1;
-			log_msg(LOG_DEBUG, "	There are no tracks to play\r\n");
-		}
-	}
-	
-	return;
+    if (FileExists(iniPath)) log_msg(LOG_DEBUG, "Reading audio settings from: %s", iniPath);
+    else                     log_msg(LOG_DEBUG, "Audio settings file %s does not exist.", iniPath);
+
+    static const char *fileFormats[] = { ".wav", ".mp3", ".ogg", ".flac", ".aiff" };
+    const unsigned int numFormats = (unsigned)(sizeof fileFormats / sizeof fileFormats[0]);
+
+    FileFormat   = GetPrivateProfileIntA("Settings", "FileFormat",   0, iniPath);
+    PlaybackMode = GetPrivateProfileIntA("Settings", "PlaybackMode", 0, iniPath);
+    GetPrivateProfileStringA("Settings", "MusicFolder", "tamus", MusicFolder, MAX_PATH, iniPath);
+
+    if ((unsigned)FileFormat >= numFormats) {
+        log_msg(LOG_WARN, "FileFormat=%d invalid; defaulting to 0", FileFormat);
+        FileFormat = 0;
+    }
+
+    log_msg(LOG_INFO, "FileFormat=%s (%d)", fileFormats[FileFormat] + 1, FileFormat);
+    log_msg(LOG_INFO, "PlaybackMode=%d",     PlaybackMode);
+    log_msg(LOG_INFO, "MusicFolder=%s",      MusicFolder);
+
+    // --- make MusicFolder absolute (DLL dir + relative folder) ---
+    BOOL isAbs = ((MusicFolder[0] && MusicFolder[1] == ':') ||  // "C:"
+                  (MusicFolder[0] == '\\' && MusicFolder[1] == '\\')); // UNC
+    if (isAbs) snprintf(MusicFolderFullPath, sizeof MusicFolderFullPath, "%s", MusicFolder);
+    else       snprintf(MusicFolderFullPath, sizeof MusicFolderFullPath, "%s\\%s", dllDir, MusicFolder);
+    log_msg(LOG_INFO, "Reading music files from: %s", MusicFolderFullPath);
+
+    // --- CD vs files ---
+    if (PlaybackMode == CD) {
+        cdTracks = BASS_CD_GetTracks(0);
+        log_msg(LOG_INFO, "Number of tracks on CD: %d", cdTracks);
+        return;
+    }
+
+    if (PlaybackMode == MUSICFILE) {
+        char searchMask[MAX_PATH];
+        snprintf(searchMask, sizeof searchMask, "%s\\*.%s", MusicFolderFullPath, fileFormats[FileFormat] + 1);
+
+        WIN32_FIND_DATAA ffd;
+        HANDLE hFind = FindFirstFileA(searchMask, &ffd);
+        int i = FIRST_TRACK_INDEX;  // e.g., 2
+        numTracks = 0;
+
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+                char fullpath[MAX_PATH];
+                snprintf(fullpath, sizeof fullpath, "%s\\%s", MusicFolderFullPath, ffd.cFileName);
+                snprintf(tracks[i].path, sizeof tracks[i].path, "%s", fullpath);
+                log_msg(LOG_DEBUG, "Track %d: %s", i, tracks[i].path);
+                ++numTracks; ++i;
+                if (i >= MAX_TRACKS) break;
+            } while (FindNextFileA(hFind, &ffd));
+            FindClose(hFind);
+            noFiles = 0;
+        }
+
+        if (numTracks > 0) {
+            firstTrack   = FIRST_TRACK_INDEX;
+            lastTrack    = FIRST_TRACK_INDEX + numTracks - 1;
+            currentTrack = FIRST_TRACK_INDEX;
+            nextTrack    = (numTracks > 1) ? (FIRST_TRACK_INDEX + 1) : FIRST_TRACK_INDEX;
+            log_msg(LOG_INFO, "Assigned tracks → first=%d last=%d current=%d next=%d (count=%d)",
+                    firstTrack, lastTrack, currentTrack, nextTrack, numTracks);
+        } else {
+            currentTrack = nextTrack = lastTrack = 0;
+            noFiles = 1;
+            log_msg(LOG_WARN, "No tracks found in %s", MusicFolderFullPath);
+        }
+    }
 }
 
 void printBassError(const char *text)
@@ -906,19 +921,17 @@ void WINAPI fake_ExitProcess(UINT uExitCode)
 {
 	BASS_WASAPI_Free();
 	BASS_Free();
+	
+	DeleteCriticalSection(&cs);
+	DeleteCriticalSection(&log_cs);
 	if (fh)
 	{
+		fflush(fh);
 		fclose(fh);
 		fh = NULL;
 	}
 
 	return ExitProcess(uExitCode);
-}
-
-int wgmus_main()
-{
-	wgmus_config();
-	return 0;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
@@ -933,20 +946,36 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			patch_call_nop((void*)0x004E71A0, (void*)fake_ExitProcess);
 			patch_call_nop((void*)0x004EADF2, (void*)fake_ExitProcess);
 		}
+        // Avoid per-thread attach/detach calls to keep things lean
+        DisableThreadLibraryCalls(hinstDLL);
 
-		fh = fopen("wgmus.log", "w"); /* Renamed to .log*/
+        // 1) Open log (unbuffered), init log_cs, mark logger ready, write banner
+        init_logger_paths(hinstDLL);
+
+        // 2) Load INI from the same folder, parse numeric or named levels
+        load_log_config(hinstDLL);
+
+        // 3) Confirm final level (now that parsing is done)
+        log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
+
+        // 4) Your DLL/game init (keep it lightweight for DllMain)
+		wgmus_config(hinstDLL);
+		
+		// (Optional) If you still need musdll_path for other uses, set it now:
+		GetModuleFileNameA(hinstDLL, musdll_path, sizeof musdll_path);
+
+        log_msg(LOG_INFO, "==== session start ====");
 
 		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
 		log_msg(LOG_DEBUG, "dll attached\r\n");
 		log_msg(LOG_DEBUG, "musdll_path = %s\r\n", musdll_path);
-
-		InitializeCriticalSection(&cs);
-		wgmus_config();
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)
 	{
-
+		if (fh) {
+            log_msg(LOG_INFO, "dll detached, shutting down");
+        }
     }
 
     return TRUE;
