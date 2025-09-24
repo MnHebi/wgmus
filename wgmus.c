@@ -458,11 +458,13 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 	
 	if(dec == 0)
 	{
+		check_bass_error("WasapiProc failed cause decoder stream was 0");
 		return 1;
 	}
 	
 	if(dec < 0)
 	{
+		check_bass_error("WasapiProc failed cause decoder stream was less than 0");
 		return 1;
 	}
 	
@@ -702,6 +704,7 @@ int bass_pause()
 			BASS_WASAPI_Free();
 			bass_init();
 			log_msg(LOG_DEBUG, "Error during pause handling, calling BASS_WASAPI_FREE() and redoing device initialization\n");
+			check_bass_error("Checking BASS errors after error in pause handling");
 		}
 		else
 		BASS_WASAPI_Stop(FALSE);
@@ -872,7 +875,7 @@ int bass_resume(void)
         playState = PLAYING;
         return 0;
     }
-
+	check_bass_error("Bass_Resume error check");
     return 1; // error
 }
 
@@ -939,7 +942,7 @@ int bass_clear(void)
         log_msg(LOG_DEBUG, "bass_clear: stream reopened successfully\n");
         return 0;
     }
-
+	check_bass_error("bass_clear error check");
     return 1; // error
 }
 
@@ -1043,7 +1046,7 @@ int bass_forceplay(const char *path)
         timesPlayed++;
         log_msg(LOG_DEBUG, "Forced playback started (track=%d)\n", currentTrack);
     }
-
+	check_bass_error("BASS Error check on forceplay end");
     return 0;
 }
 
