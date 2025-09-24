@@ -252,10 +252,10 @@ int WasapiVolumeConfig(DWORD streamVol)
 	streamVol = 10000;
 	}
 	wasapiVolume = (double) streamVol * 0.99 / 10000.0;
-	log_msg(LOG_DEBUG, "			Wasapi volume: %.2f\r\n", wasapiVolume);
+	log_msg(LOG_DEBUG, "Wasapi volume: %.2f\r\n", wasapiVolume);
 	
-	log_msg(LOG_DEBUG, "			Wasapi Volume Config wasapiVolume: %.2f\r\n", wasapiVolume); 
-	log_msg(LOG_DEBUG, "			Wasapi Volume Config streamVol: %d\r\n", streamVol); 
+	log_msg(LOG_DEBUG, "Wasapi Volume Config wasapiVolume: %.2f\r\n", wasapiVolume); 
+	log_msg(LOG_DEBUG, "Wasapi Volume Config streamVol: %d\r\n", streamVol); 
 	BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, streamVol);
 	
 	return BASS_ChannelSetAttribute(dec, BASS_ATTRIB_VOLDSP, wasapiVolume);
@@ -419,20 +419,57 @@ void wgmus_config(HINSTANCE hinstDLL)
     }
 }
 
+static int open_track_stream(int track, int fileFormat, int playbackMode)
+{
+    HSTREAM newStream = 0;
+
+    if (playbackMode == CD) {
+        newStream = BASS_CD_StreamCreate(0, track, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
+    } 
+    else if (playbackMode == MUSICFILE) {
+        if (fileFormat == 3) { // FLAC
+            newStream = BASS_FLAC_StreamCreateFile(
+                FALSE, tracks[track].path, 0, 0,
+                BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN
+            );
+        } else { // WAV/MP3/OGG/AIFF
+            newStream = BASS_StreamCreateFile(
+                FALSE, tracks[track].path, 0, 0,
+                BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN
+            );
+        }
+    }
+
+    if (!newStream) {
+        check_bass_error("Failed to create stream");
+        return 1;
+    }
+
+    // Free old decoder stream if necessary
+    if (dec) {
+        BASS_StreamFree(dec);
+    }
+
+    dec = newStream;
+    BASS_Mixer_StreamAddChannel(str, dec, 0);
+
+    return 0;
+}
+
 void printBassError(const char *text)
 {
 	if(BASS_ErrorGetCode() != 0)
 	{
 		if(BASS_ErrorGetCode() != -1)
 		{
-			log_msg(LOG_DEBUG, "			Error(%d): %s\n", BASS_ErrorGetCode(), text);
+			log_msg(LOG_DEBUG, "Error(%d): %s\n", BASS_ErrorGetCode(), text);
 
                         return;
 		}
 		else
 		if(BASS_ErrorGetCode() == -1)
 		{
-			log_msg(LOG_DEBUG, "			No errors(%d): %s\n", BASS_ErrorGetCode(), text);
+			log_msg(LOG_DEBUG, "No errors(%d): %s\n", BASS_ErrorGetCode(), text);
 
                         return;
 		}
@@ -453,7 +490,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 	}
 	else
 	{
-		log_msg(LOG_DEBUG, "			File length was 0; setting progress to 100%.\r\n");
+		log_msg(LOG_DEBUG, "File length was 0; setting progress to 100%.\r\n");
 		bassPlaybackProgress = 100.0; // Or idk if should be 0.0 Keeper
 	}
 	DWORD bassActivity = BASS_ChannelIsActive(dec);
@@ -465,10 +502,10 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 			{
 				notify = 0;
 				changeNotify = 0;
-				log_msg(LOG_DEBUG, "			Finished playback\r\n");
+				log_msg(LOG_DEBUG, "Finished playback\r\n");
 				playState = STOPPED;
 				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
-				log_msg(LOG_DEBUG, "			BASS no activity\r\n");
+				log_msg(LOG_DEBUG, "BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
 			}
@@ -480,10 +517,10 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 			{
 				notify = 0;
 				changeNotify = 0;
-				log_msg(LOG_DEBUG, "			Finished playback\r\n");
+				log_msg(LOG_DEBUG, "Finished playback\r\n");
 				playState = PLAYING;
 				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
-				log_msg(LOG_DEBUG, "			BASS no activity\r\n");
+				log_msg(LOG_DEBUG, "BASS no activity\r\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
 			}
@@ -508,18 +545,18 @@ int bass_init()
 	static enum INITDONE{ YES, NO } initDone = NO;
 	if (initDone == YES)
 	{
-		log_msg(LOG_DEBUG, "			BASS already initialized, checking device status\r\n");
+		log_msg(LOG_DEBUG, "BASS already initialized, checking device status\r\n");
 		
 		if(bassDeviceCheck == -1)
 		{
-			log_msg(LOG_DEBUG, "			BASS Device was not intialized, initializing\r\n");
+			log_msg(LOG_DEBUG, "BASS Device was not intialized, initializing\r\n");
 			playerState = OPENED;
 			playState = NOTPLAYING;
 			BASS_Init(0, 4800, 0, 0, NULL);
 		}
 		else
 		{
-			log_msg(LOG_DEBUG, "			BASS_Init already done & device is operational, doing nothing\r\n");
+			log_msg(LOG_DEBUG, "BASS_Init already done & device is operational, doing nothing\r\n");
 		}
 		
 		if(wasapiDeviceCheck == -1)
@@ -527,12 +564,12 @@ int bass_init()
 			BASS_WASAPI_Free();
 			playerState = OPENED;
 			playState = NOTPLAYING;
-			log_msg(LOG_DEBUG, "			BASS WASAPI Device was not initialized, initializing\r\n");
+			log_msg(LOG_DEBUG, "BASS WASAPI Device was not initialized, initializing\r\n");
 			BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
 		}
 		else
 		{
-			log_msg(LOG_DEBUG, "			BASS_WASAPI_Init already done & device is operational, doing nothing\r\n");
+			log_msg(LOG_DEBUG, "BASS_WASAPI_Init already done & device is operational, doing nothing\r\n");
 		}
 		
 		if(playerState != OPENED)
@@ -540,10 +577,10 @@ int bass_init()
 			playerState = OPENED;
 		}
 		
-		log_msg(LOG_DEBUG, "    Checking stream status\r\n");
+		log_msg(LOG_DEBUG, "Checking stream status\r\n");
 		if(BASS_ErrorGetCode() == 5)
 		{
-			log_msg(LOG_DEBUG, "			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+			log_msg(LOG_DEBUG, "Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
 		}
@@ -551,36 +588,36 @@ int bass_init()
 	else
 	if (noFiles == 0)
 	{
-		log_msg(LOG_DEBUG, "	Audio library for commands is: BASS\r\n");
-		log_msg(LOG_DEBUG, "	BASS_Init\r\n");
-		log_msg(LOG_DEBUG, "    BASS Device initializing\r\n");
+		log_msg(LOG_DEBUG, "Audio library for commands is: BASS\r\n");
+		log_msg(LOG_DEBUG, "BASS_Init\r\n");
+		log_msg(LOG_DEBUG, "BASS Device initializing\r\n");
 		BASS_Init(0, 4800, 0, 0, NULL);
-		check_bass_error("			BASS Error Occured After BASS Init");
+		check_bass_error("BASS Error Occured After BASS Init");
 		
-		log_msg(LOG_DEBUG, "			BASS WASAPI Device initializing\r\n");
+		log_msg(LOG_DEBUG, "BASS WASAPI Device initializing\r\n");
 		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
-		check_bass_error("			BASS Error Occured After BASS Wasapi Init");
+		check_bass_error("BASS Error Occured After BASS Wasapi Init");
 
 		BASS_WASAPI_GetInfo(&info);
 		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
-		check_bass_error("			BASS Error Occured After Mixer Stream Init");
+		check_bass_error("BASS Error Occured After Mixer Stream Init");
 		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
-		check_bass_error("			BASS Error Occured After Decoder Stream Init");
+		check_bass_error("BASS Error Occured After Decoder Stream Init");
 		BASS_Mixer_StreamAddChannel(str, dec, 0);
 		initDone = YES;
-		log_msg(LOG_DEBUG, "			Checking Player and Play Status\r\n");
-		check_bass_error("			BASS Error occured after initializing player state check");
+		log_msg(LOG_DEBUG, "Checking Player and Play Status\r\n");
+		check_bass_error("BASS Error occured after initializing player state check");
 		switch (playerState)
 		{
 			case OPENED:
 			{
-				log_msg(LOG_DEBUG, "			Player Status: OPENED\r\n");
+				log_msg(LOG_DEBUG, "Player Status: OPENED\r\n");
 				break;
 			}
 			case CLOSED:
 			{
-				log_msg(LOG_DEBUG, "			Player Status: CLOSED\r\n");
-				log_msg(LOG_DEBUG, "			Player Status should not be CLOSED on INIT, SETTING OPENED\r\n");
+				log_msg(LOG_DEBUG, "Player Status: CLOSED\r\n");
+				log_msg(LOG_DEBUG, "Player Status should not be CLOSED on INIT, SETTING OPENED\r\n");
 				playerState = OPENED;
 				break;
 			}
@@ -589,24 +626,24 @@ int bass_init()
 		{
 			case PLAYING:
 			{
-				log_msg(LOG_DEBUG, "			Play Status: PLAYING\r\n");
+				log_msg(LOG_DEBUG, "Play Status: PLAYING\r\n");
 				break;
 			}
 			case PAUSED:
 			{
-				log_msg(LOG_DEBUG, "			Play Status: PAUSED\r\n");
+				log_msg(LOG_DEBUG, "Play Status: PAUSED\r\n");
 				break;
 			}
 			case STOPPED:
 			{
-				log_msg(LOG_DEBUG, "			Play Status: STOPPED\r\n");
+				log_msg(LOG_DEBUG, "Play Status: STOPPED\r\n");
 				break;
 			}
 		}
-		log_msg(LOG_DEBUG, "			BASS Device Number is: %d\r\n", BASS_GetDevice());
-		log_msg(LOG_DEBUG, "			BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+		log_msg(LOG_DEBUG, "BASS Device Number is: %d\r\n", BASS_GetDevice());
+		log_msg(LOG_DEBUG, "BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
-		check_bass_error("			BASS Error occured after playerState and playState check");
+		check_bass_error("BASS Error occured after playerState and playState check");
 		
 		DWORD dataBuffer;
 		DWORD bufferSize = sizeof(dataBuffer);
@@ -634,12 +671,12 @@ int bass_init()
 			return 1;
 		}
 
-		log_msg(LOG_DEBUG, "	musicvol regkey status: %d\r\n", status);
-		log_msg(LOG_DEBUG, "	musicvol regkey value: %d\r\n", dataBuffer);
-		log_msg(LOG_DEBUG, "	musicvol regkey size: %d\r\n", bufferSize);
+		log_msg(LOG_DEBUG, "musicvol regkey status: %d\r\n", status);
+		log_msg(LOG_DEBUG, "musicvol regkey value: %d\r\n", dataBuffer);
+		log_msg(LOG_DEBUG, "musicvol regkey size: %d\r\n", bufferSize);
 		dwVolume = dataBuffer;
 		finalVolume = dwVolume * 156.25;
-		log_msg(LOG_DEBUG, "			BASS initial stream volume set at: %d\r\n", finalVolume);
+		log_msg(LOG_DEBUG, "BASS initial stream volume set at: %d\r\n", finalVolume);
 		WasapiVolumeConfig(finalVolume);
 	}
 	return 0;
@@ -653,21 +690,22 @@ int bass_pause()
 		{
 			BASS_WASAPI_Free();
 			bass_init();
-			log_msg(LOG_DEBUG, "			Error during pause handling, calling BASS_WASAPI_FREE() and redoing device initialization\r\n");
+			log_msg(LOG_DEBUG, "Error during pause handling, calling BASS_WASAPI_FREE() and redoing device initialization\r\n");
 		}
 		else
 		BASS_WASAPI_Stop(FALSE);
-		log_msg(LOG_DEBUG, "	BASS_WASAPI_Stop(pause)\r\n");
+		log_msg(LOG_DEBUG, "BASS_WASAPI_Stop(pause)\r\n");
 	}
 	else
 	if (noFiles == 1)
 	{
-		log_msg(LOG_DEBUG, "			Pause was called when no playable music files are present\r\n");
+		log_msg(LOG_DEBUG, "Pause was called when no playable music files are present\r\n");
 		return 1;
 	}
     return 0;
 }
 
+/*
 void bass_stop()
 {
 	if (noFiles == 0)
@@ -679,7 +717,7 @@ void bass_stop()
 				BASS_WASAPI_Stop(TRUE);
 				BASS_StreamFree(dec);
 				BASS_WASAPI_Start();
-				log_msg(LOG_DEBUG, "			BASS_WASAPI_Stop\r\n");
+				log_msg(LOG_DEBUG, "BASS_WASAPI_Stop\r\n");
 				playState = STOPPED;
 			}
 			else
@@ -687,27 +725,54 @@ void bass_stop()
 			{
 				BASS_WASAPI_Free();
 				bass_init();
-				log_msg(LOG_DEBUG, "			BASS_WASAPI_Free\r\n");
+				log_msg(LOG_DEBUG, "BASS_WASAPI_Free\r\n");
 			}
 			else
 			if(BASS_ErrorGetCode() == 5)
 			{
 				BASS_WASAPI_Free();
 				bass_init();
-				log_msg(LOG_DEBUG, "			Bass Error 5 encountered, running bass_init again to restart streams\r\n");
+				log_msg(LOG_DEBUG, "Bass Error 5 encountered, running bass_init again to restart streams\r\n");
 			}
 		}
 		else
 		BASS_WASAPI_Stop(TRUE);
 		BASS_StreamFree(dec);
 		BASS_WASAPI_Start();
-		log_msg(LOG_DEBUG, "			BASS_WASAPI_Stop\r\n");
+		log_msg(LOG_DEBUG, "BASS_WASAPI_Stop\r\n");
 		playState = STOPPED;
-		/*timesPlayed = 0;*/
 	}
 	return;
 }
+*/
 
+void bass_stop(void)
+{
+    if (noFiles) {
+        log_msg(LOG_INFO, "bass_stop: no files to stop\n");
+        return;
+    }
+
+    log_msg(LOG_DEBUG, "bass_stop: stopping playback (track=%d)\n", currentTrack);
+
+    // Stop WASAPI regardless of error state
+    BASS_WASAPI_Stop(TRUE);
+
+    // Free the decoder stream if valid
+    if (dec) {
+        BASS_StreamFree(dec);
+        dec = 0;
+    }
+
+    // Restart WASAPI so next play call works
+    BASS_WASAPI_Start();
+
+    // Reset state
+    playState = STOPPED;
+    log_msg(LOG_DEBUG, "bass_stop: playback stopped successfully\n");
+}
+
+/*
 int bass_resume()
 {
 	if (noFiles == 0)
@@ -744,14 +809,14 @@ int bass_resume()
 				{
 					if(FileFormat != 3)
 					{
-						log_msg(LOG_DEBUG, "			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+						log_msg(LOG_DEBUG, "Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
 					else
 					if(FileFormat == 3)
 					{
-						log_msg(LOG_DEBUG, "			Encountered BASS Error 5, reinitialize Decoder stream\r\n");
+						log_msg(LOG_DEBUG, "Encountered BASS Error 5, reinitialize Decoder stream\r\n");
 						dec = BASS_FLAC_StreamCreateFile(FALSE, tracks[currentTrack].path, 0, 0, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
 						BASS_Mixer_StreamAddChannel(str, dec, 0);
 					}
@@ -760,12 +825,47 @@ int bass_resume()
 				BASS_WASAPI_Start();
 			}
 		}
-		log_msg(LOG_DEBUG, "			BASS_WASAPI_Start(unpause)\r\n");
+		log_msg(LOG_DEBUG, "BASS_WASAPI_Start(unpause)\r\n");
 		playState = PLAYING;
 	}
 	return 0;
 }
+*/
 
+int bass_resume(void)
+{
+    if (noFiles) return 1;
+
+    if (playState == PAUSED) {
+        log_msg(LOG_DEBUG, "bass_resume: resuming from PAUSED\n");
+        BASS_Start();
+        BASS_WASAPI_Start();
+        playState = PLAYING;
+        return 0;
+    }
+
+    if (playState == PLAYING) {
+        // Already playing, just ensure WASAPI is active
+        log_msg(LOG_DEBUG, "bass_resume: already PLAYING, restarting WASAPI\n");
+        BASS_Start();
+        BASS_WASAPI_Start();
+        return 0;
+    }
+
+    // If not paused or playing, reopen the current track
+    log_msg(LOG_DEBUG, "bass_resume: reopening stream (track=%d)\n", currentTrack);
+
+    if (open_track_stream(currentTrack, FileFormat, PlaybackMode) == 0) {
+        BASS_Start();
+        BASS_WASAPI_Start();
+        playState = PLAYING;
+        return 0;
+    }
+
+    return 1; // error
+}
+
+/*
 int bass_clear()
 {
 	if (noFiles == 0)
@@ -800,14 +900,39 @@ int bass_clear()
 				BASS_WASAPI_Start();
 			}
 		}
-		log_msg(LOG_DEBUG, "			Track for bass_clear is: %d\r\n", currentTrack);
-		log_msg(LOG_DEBUG, "			BASS_ChannelStop + StreamFree + ChannelPlay\r\n");
+		log_msg(LOG_DEBUG, "Track for bass_clear is: %d\r\n", currentTrack);
+		log_msg(LOG_DEBUG, "BASS_ChannelStop + StreamFree + ChannelPlay\r\n");
 
                 return 0;
 	}
 	return 0;
 }
+*/
 
+int bass_clear(void)
+{
+    if (noFiles) return 1;
+
+    log_msg(LOG_DEBUG, "bass_clear: resetting decoder stream (track=%d)\n", currentTrack);
+	
+
+    // Free the old stream before reopening
+    if (dec) {
+        BASS_StreamFree(dec);
+        dec = 0;
+    }
+
+    if (open_track_stream(currentTrack, FileFormat, PlaybackMode) == 0) {
+        BASS_WASAPI_Stop(TRUE);  // reset playback state
+        BASS_WASAPI_Start();     // restart with fresh stream
+        log_msg(LOG_DEBUG, "bass_clear: stream reopened successfully\n");
+        return 0;
+    }
+
+    return 1; // error
+}
+
+/*
 int bass_forceplay(const char *path)
 {
 	DWORD bassDeviceCheck;
@@ -818,7 +943,7 @@ int bass_forceplay(const char *path)
 	{
 		if(playState != PAUSED)
 		{
-			check_bass_error("			BASS Error occured during forceplay beginning()");
+			check_bass_error("BASS Error occured during forceplay beginning()");
 			if(currentTrack == 0)
 			{
 				currentTrack = FIRST_TRACK_INDEX;
@@ -831,19 +956,19 @@ int bass_forceplay(const char *path)
 				{
 					if (!BASS_Init(0, 48000, 0, 0, NULL))
 					{
-						log_msg(LOG_DEBUG, "			Bass Device Initialization FAILED\r\n");
+						log_msg(LOG_DEBUG, "Bass Device Initialization FAILED\r\n");
 					}
 				}
 				if(wasapiDeviceCheck == -1)
 				{
 					if (!BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL))
 					{
-						log_msg(LOG_DEBUG, "			Wasapi Device Initialization FAILED\r\n");
+						log_msg(LOG_DEBUG, "Wasapi Device Initialization FAILED\r\n");
 					}
 				}
 			}
-			log_msg(LOG_DEBUG, "			bass_forceplay\r\n");
-			log_msg(LOG_DEBUG, "			BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
+			log_msg(LOG_DEBUG, "bass_forceplay\r\n");
+			log_msg(LOG_DEBUG, "BASS WASAPI Device Number is: %d\r\n", BASS_WASAPI_GetDevice());
 		
 			if (PlaybackMode == CD)
 			{
@@ -854,7 +979,7 @@ int bass_forceplay(const char *path)
 				BASS_WASAPI_Start();
 				playState = PLAYING;
 				timesPlayed++;
-				log_msg(LOG_DEBUG, "			Begin CD Playback\r\n");
+				log_msg(LOG_DEBUG, "Begin CD Playback\r\n");
 			}
 			else
 			if (PlaybackMode == MUSICFILE)
@@ -869,7 +994,7 @@ int bass_forceplay(const char *path)
 					BASS_WASAPI_Start();
 					playState = PLAYING;
 					timesPlayed++;
-					log_msg(LOG_DEBUG, "			Begin Music File Playback\r\n");
+					log_msg(LOG_DEBUG, "Begin Music File Playback\r\n");
 				}
 				else
 				if(FileFormat == 3)
@@ -889,7 +1014,29 @@ int bass_forceplay(const char *path)
 	}
 	return 0;
 }
+*/
 
+int bass_forceplay(const char *path)
+{
+    if (noFiles) return 1;
+
+	log_msg(LOG_DEBUG, "bass_forceplay\r\n");
+
+    if (currentTrack == 0) {
+        currentTrack = 2;
+    }
+
+    if (open_track_stream(currentTrack, FileFormat, PlaybackMode) == 0) {
+        BASS_WASAPI_Start();
+        playState = PLAYING;
+        timesPlayed++;
+        log_msg(LOG_DEBUG, "Forced playback started (track=%d)\n", currentTrack);
+    }
+
+    return 0;
+}
+
+/*
 int bass_play(const char *path)
 {
 	DWORD bassDeviceCheck;
@@ -971,6 +1118,32 @@ int bass_play(const char *path)
 	}
 	
 	return 0;
+}
+*/
+
+int bass_play(const char *path)
+{
+    if (noFiles) return 1;
+
+    if (playState == PAUSED) {
+        // Already paused, nothing to do
+        return 0;
+    }
+
+    log_msg(LOG_DEBUG, "bass_play: preparing playback\n");
+
+    if (currentTrack == 0) {
+        currentTrack = 2; // keep your existing offset logic
+    }
+
+    if (open_track_stream(currentTrack, FileFormat, PlaybackMode) == 0) {
+        BASS_WASAPI_Start();
+        playState = PLAYING;
+        timesPlayed++;
+        log_msg(LOG_DEBUG, "Playback started (track=%d)\n", currentTrack);
+    }
+	check_bass_error("BASS Error check on play end");
+    return 0;
 }
 
 void WINAPI fake_ExitProcess(UINT uExitCode)
