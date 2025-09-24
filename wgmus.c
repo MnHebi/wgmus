@@ -129,6 +129,7 @@ static int check_bass_error(const char *ctx){ int e=BASS_ErrorGetCode(); if(!e) 
 #define MAX_TRACKS 99
 
 CRITICAL_SECTION cs;
+CRITICAL_SECTION wproc_cs;
 
 char musdll_path[2048];
 
@@ -218,32 +219,6 @@ int changeNotify = 0;
 int noFiles = 0;
 
 /* AUDIO PLAYBACK DEFINES END */
-
-/*
-static void init_wgmus(HINSTANCE hinstDLL)
-{
-    char logPath[MAX_PATH];
-    path_next_to_dll(hinstDLL, "wgmus.log", logPath, sizeof logPath);
-
-    fopen_s(&fh, logPath, "w");
-    if (fh) {
-        // Unbuffered so even early crashes leave bytes on disk
-        setvbuf(fh, NULL, _IONBF, 0);
-        InitializeCriticalSection(&log_cs);
-        InterlockedExchange(&g_log_ready, 1);
-
-        // Guaranteed first bytes (not filtered by log level)
-        fprintf(fh, "[logger] started at %s\n", logPath);
-        fflush(fh);
-    }
-
-    InitializeCriticalSection(&cs);
-
-    // Load INI (see section 3) and then announce final level
-    load_log_config(hinstDLL);  // defined below
-    log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
-}
-*/
 
 int WasapiVolumeConfig(DWORD streamVol)
 {
@@ -479,6 +454,18 @@ void printBassError(const char *text)
 
 DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
+	InitializeCriticalSection(&wproc_cs);
+	
+	if(dec == 0)
+	{
+		return 1;
+	}
+	
+	if(dec < 0)
+	{
+		return 1;
+	}
+	
 	DWORD c = BASS_ChannelGetData(str, buffer, length);
 	bassDecodePos = BASS_ChannelGetPosition(dec, BASS_POS_DECODE);
 	bassGetLength = BASS_ChannelGetLength(dec, BASS_POS_BYTE);
@@ -508,6 +495,7 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 				log_msg(LOG_DEBUG, "BASS no activity\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
+				return 0;
 			}
 		}
 		else
@@ -523,11 +511,34 @@ DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 				log_msg(LOG_DEBUG, "BASS no activity\n");
 				BASS_WASAPI_Stop(TRUE);
 				BASS_WASAPI_Start();
+				return 0;
 			}
 		}
 	}
 	
     return c;
+}
+
+static void init_wgmus(HINSTANCE hinstDLL)
+{
+        // 1) Open log (unbuffered), init log_cs, mark logger ready, write banner
+        init_logger_paths(hinstDLL);
+
+        // 2) Load INI from the same folder, parse numeric or named levels
+        load_log_config(hinstDLL);
+
+        // 3) Confirm final level (now that parsing is done)
+        log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
+
+        // 4) Your DLL/game init (keep it lightweight for DllMain)
+		wgmus_config(hinstDLL);
+		
+		// (Optional) If you still need musdll_path for other uses, set it now:
+		GetModuleFileNameA(hinstDLL, musdll_path, sizeof musdll_path);
+
+        log_msg(LOG_INFO, "==== session start ====");
+		log_msg(LOG_DEBUG, "dll attached\n");
+		log_msg(LOG_DEBUG, "musdll_path = %s\n", musdll_path);
 }
 
 int bass_init()
@@ -1152,6 +1163,7 @@ void WINAPI fake_ExitProcess(UINT uExitCode)
 	BASS_Free();
 	
 	DeleteCriticalSection(&cs);
+	DeleteCriticalSection(&wproc_cs);
 	DeleteCriticalSection(&log_cs);
 	if (fh)
 	{
@@ -1177,28 +1189,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		}
         // Avoid per-thread attach/detach calls to keep things lean
         DisableThreadLibraryCalls(hinstDLL);
-
-        // 1) Open log (unbuffered), init log_cs, mark logger ready, write banner
-        init_logger_paths(hinstDLL);
-
-        // 2) Load INI from the same folder, parse numeric or named levels
-        load_log_config(hinstDLL);
-
-        // 3) Confirm final level (now that parsing is done)
-        log_msg(LOG_INFO, "Log level set to: %s", log_level_str[g_log_level]);
-
-        // 4) Your DLL/game init (keep it lightweight for DllMain)
-		wgmus_config(hinstDLL);
 		
-		// (Optional) If you still need musdll_path for other uses, set it now:
-		GetModuleFileNameA(hinstDLL, musdll_path, sizeof musdll_path);
-
-        log_msg(LOG_INFO, "==== session start ====");
-
-		GetModuleFileName(hinstDLL, musdll_path, sizeof musdll_path);
-		log_msg(LOG_DEBUG, "dll attached\n");
-		log_msg(LOG_DEBUG, "musdll_path = %s\n", musdll_path);
 		InitializeCriticalSection(&cs);
+		init_wgmus(hinstDLL);
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)

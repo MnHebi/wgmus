@@ -89,7 +89,4 @@ void init_logger_paths(HINSTANCE hinstDLL)
             fflush(fh);
         }
     }
-
-    /* Initialize your main critical section too if not already done */
-    InitializeCriticalSection(&cs);
 }
