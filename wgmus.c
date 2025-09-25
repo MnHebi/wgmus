@@ -39,6 +39,14 @@
 
 /* PROJECT LIBRARIES END */
 
+// CRITICAL SECTIONS/ATOMIC LOCK VARS ETC
+CRITICAL_SECTION cs;
+CRITICAL_SECTION wproc_cs;
+CRITICAL_SECTION log_cs;
+static CRITICAL_SECTION audio_cs;
+
+static LONG audio_inited = 0;
+
 /* ---------- Forward declarations ---------- */
 static int open_track_stream_table(int track, const char *path);
 static void fade_in_current(DWORD ms);
@@ -52,11 +60,9 @@ void log_msg(log_level_t level, const char *fmt, ...);
 
 /* AUDIO LIBRARY INCLUDES END */
 
-
 /* ====================== LOGGER ====================== */
 //typedef enum { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR } log_level_t;
 const char* log_level_str[] = { "DEBUG","INFO","WARN","ERROR" };
-CRITICAL_SECTION log_cs;
 log_level_t g_log_level = LOG_INFO;
 FILE *fh = NULL;
 volatile LONG g_log_ready = 0;
@@ -127,9 +133,6 @@ static int check_bass_error(const char *ctx){ int e=BASS_ErrorGetCode(); if(!e) 
 #define MAGIC_DEVICEID 0xBEEF
 #define FIRST_TRACK_INDEX 2
 #define MAX_TRACKS 99
-
-CRITICAL_SECTION cs;
-CRITICAL_SECTION wproc_cs;
 
 char musdll_path[2048];
 
@@ -398,20 +401,16 @@ static int open_track_stream(int track, int fileFormat, int playbackMode)
 {
     HSTREAM newStream = 0;
 
+    // --- 1) Create new decoder OUTSIDE the lock ---
     if (playbackMode == CD) {
         newStream = BASS_CD_StreamCreate(0, track, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
-    } 
-    else if (playbackMode == MUSICFILE) {
+    } else if (playbackMode == MUSICFILE) {
         if (fileFormat == 3) { // FLAC
-            newStream = BASS_FLAC_StreamCreateFile(
-                FALSE, tracks[track].path, 0, 0,
-                BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN
-            );
+            newStream = BASS_FLAC_StreamCreateFile(FALSE, tracks[track].path, 0, 0,
+                          BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
         } else { // WAV/MP3/OGG/AIFF
-            newStream = BASS_StreamCreateFile(
-                FALSE, tracks[track].path, 0, 0,
-                BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN
-            );
+            newStream = BASS_StreamCreateFile(FALSE, tracks[track].path, 0, 0,
+                          BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE | BASS_STREAM_PRESCAN);
         }
     }
 
@@ -420,13 +419,30 @@ static int open_track_stream(int track, int fileFormat, int playbackMode)
         return 1;
     }
 
-    // Free old decoder stream if necessary
-    if (dec) {
-        BASS_StreamFree(dec);
+    // --- 2) Atomically swap UNDER the lock & attach to mixer ---
+    HSTREAM old_dec = 0;
+    BOOL add_ok = TRUE;
+
+    EnterCriticalSection(&audio_cs);
+        old_dec = dec;
+        dec = newStream;                                    // publish new
+        if (str) {
+            add_ok = BASS_Mixer_StreamAddChannel(str, dec, 0);
+        }
+    LeaveCriticalSection(&audio_cs);
+
+    if (!add_ok) {
+        check_bass_error("Mixer add failed");
+        // roll back; dec currently points to newStream, so restore & free new
+        EnterCriticalSection(&audio_cs);
+            dec = old_dec;
+        LeaveCriticalSection(&audio_cs);
+        BASS_StreamFree(newStream);
+        return 1;
     }
 
-    dec = newStream;
-    BASS_Mixer_StreamAddChannel(str, dec, 0);
+    // --- 3) Free old decoder OUTSIDE the lock ---
+    if (old_dec) BASS_StreamFree(old_dec);
 
     return 0;
 }
@@ -452,72 +468,99 @@ void printBassError(const char *text)
 	return;
 }
 
+static void CALLBACK OnEnd(HSYNC h, DWORD chan, DWORD data, void *user)
+{
+    EnterCriticalSection(&audio_cs);
+        playState = STOPPED;
+        // snapshot currentTrack if needed
+        int track = currentTrack;
+    LeaveCriticalSection(&audio_cs);
+
+    // post notify after releasing lock
+    PostMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, track);
+}
+
 DWORD CALLBACK WasapiProc(void *buffer, DWORD length, void *user)
 {
-	InitializeCriticalSection(&wproc_cs);
-	
-	if(dec == 0)
-	{
-		check_bass_error("WasapiProc failed cause decoder stream was 0");
-		return 1;
-	}
-	
-	if(dec < 0)
-	{
-		check_bass_error("WasapiProc failed cause decoder stream was less than 0");
-		return 1;
-	}
-	
-	DWORD c = BASS_ChannelGetData(str, buffer, length);
-	bassDecodePos = BASS_ChannelGetPosition(dec, BASS_POS_DECODE);
-	bassGetLength = BASS_ChannelGetLength(dec, BASS_POS_BYTE);
-	bassFileLength =  BASS_StreamGetFilePosition(dec, BASS_FILEPOS_END);
-	bassBufferPos = BASS_StreamGetFilePosition(dec, BASS_FILEPOS_AVAILABLE);
-	if (bassFileLength > 0 ) 
-	{
-		bassPlaybackProgress = 100.0 * bassBufferPos / bassFileLength;
-	}
-	else
-	{
-		log_msg(LOG_DEBUG, "File length was 0; setting progress to 100%.\n");
-		bassPlaybackProgress = 100.0; // Or idk if should be 0.0 Keeper
-	}
-	DWORD bassActivity = BASS_ChannelIsActive(dec);
-	if (bassActivity == BASS_ACTIVE_STOPPED)
-	{
-		if(playState != PAUSED)
-		{
-			if(bassPlaybackProgress == 0)
-			{
-				notify = 0;
-				changeNotify = 0;
-				log_msg(LOG_DEBUG, "Finished playback\n");
-				playState = STOPPED;
-				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
-				log_msg(LOG_DEBUG, "BASS no activity\n");
-				BASS_WASAPI_Stop(TRUE);
-				BASS_WASAPI_Start();
-				return 0;
-			}
-		}
-		else
-		if(playState == PAUSED)
-		{
-			if(bassPlaybackProgress == 0)
-			{
-				notify = 0;
-				changeNotify = 0;
-				log_msg(LOG_DEBUG, "Finished playback\n");
-				playState = PLAYING;
-				SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, currentTrack);
-				log_msg(LOG_DEBUG, "BASS no activity\n");
-				BASS_WASAPI_Stop(TRUE);
-				BASS_WASAPI_Start();
-				return 0;
-			}
-		}
-	}
-	
+    // NEVER initialize a critical section here.
+    // Remove: InitializeCriticalSection(&wproc_cs);
+
+    // Try not to stall the audio thread. If the graph is mutating, output silence.
+    if (!TryEnterCriticalSection(&audio_cs)) {
+        memset(buffer, 0, length);
+        return length;
+    }
+
+    // Snapshot handles under lock so they don’t change mid-call
+    HSTREAM s_mixer = str;
+    HSTREAM s_dec   = dec;
+
+    DWORD c = 0;
+
+    if (s_mixer) {
+        c = BASS_ChannelGetData(s_mixer, buffer, length);
+        if ((int)c < 0) { c = 0; }
+    }
+    if (c == 0) {
+        memset(buffer, 0, length);
+        c = length;
+    }
+
+    // Gather decoder stats safely (optional)
+    if (s_dec) {
+        bassDecodePos   = BASS_ChannelGetPosition(s_dec, BASS_POS_DECODE);
+        bassGetLength   = BASS_ChannelGetLength(s_dec, BASS_POS_BYTE);
+        bassFileLength  = BASS_StreamGetFilePosition(s_dec, BASS_FILEPOS_END);
+        bassBufferPos   = BASS_StreamGetFilePosition(s_dec, BASS_FILEPOS_AVAILABLE);
+        if (bassFileLength > 0) {
+            bassPlaybackProgress = 100.0 * bassBufferPos / bassFileLength;
+        } else {
+            log_msg(LOG_DEBUG, "File length was 0; setting progress to 100%%.");
+            bassPlaybackProgress = 100.0;
+        }
+    }
+
+    // Decide end-of-playback actions under lock; execute outside afterward
+    int send_notify = 0;
+    int track_snap  = 0;
+    BOOL restart_wasapi = FALSE;
+
+    if (s_dec && BASS_ChannelIsActive(s_dec) == BASS_ACTIVE_STOPPED) {
+        if (playState != PAUSED) {
+            if (bassPlaybackProgress == 0) {
+                notify = 0; changeNotify = 0;
+                log_msg(LOG_DEBUG, "Finished playback");
+                playState = STOPPED;
+                track_snap = currentTrack;
+                send_notify = 1;
+                restart_wasapi = TRUE;
+            }
+        } else { // PAUSED
+            if (bassPlaybackProgress == 0) {
+                notify = 0; changeNotify = 0;
+                log_msg(LOG_DEBUG, "Finished playback (paused)");
+                playState = PLAYING; // your original logic
+                track_snap = currentTrack;
+                send_notify = 1;
+                restart_wasapi = TRUE;
+            }
+        }
+    }
+
+    LeaveCriticalSection(&audio_cs);
+
+    // Do OS calls outside the lock (avoid reentrancy/deadlocks from callback)
+    if (send_notify) {
+        // Consider PostMessageA instead of SendMessageA from a callback thread:
+        // PostMessageA(HWND_BROADCAST, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, track_snap);
+        SendMessageA((HWND)0xffff, MM_MCINOTIFY, MCI_NOTIFY_SUCCESSFUL, track_snap);
+        log_msg(LOG_DEBUG, "BASS no activity");
+        if (restart_wasapi) {
+            BASS_WASAPI_Stop(TRUE);
+            BASS_WASAPI_Start();
+        }
+    }
+
     return c;
 }
 
@@ -554,145 +597,113 @@ int bass_init()
 	
 	bassDeviceCheck = BASS_GetDevice();
 	bassDeviceCheck = BASS_WASAPI_GetDevice();
-	
-	static enum INITDONE{ YES, NO } initDone = NO;
-	if (initDone == YES)
+
+    if (InterlockedCompareExchange(&audio_inited, 1, 1) == 1)
+        return TRUE; // already attempted (ok)
+
+    EnterCriticalSection(&audio_cs);
+    if (audio_inited == 0) 
 	{
-		log_msg(LOG_DEBUG, "BASS already initialized, checking device status\n");
+        // do the real init ONCE here
+        // BASS_Init / WASAPI init / mixer create
+        // check errors and set a local ok flag
 		
-		if(bassDeviceCheck == -1)
+		if (noFiles == 0)
 		{
-			log_msg(LOG_DEBUG, "BASS Device was not intialized, initializing\n");
-			playerState = OPENED;
-			playState = NOTPLAYING;
+			log_msg(LOG_DEBUG, "Audio library for commands is: BASS\n");
+			log_msg(LOG_DEBUG, "BASS_Init\n");
+			log_msg(LOG_DEBUG, "BASS Device initializing\n");
 			BASS_Init(0, 4800, 0, 0, NULL);
-		}
-		else
-		{
-			log_msg(LOG_DEBUG, "BASS_Init already done & device is operational, doing nothing\n");
-		}
-		
-		if(wasapiDeviceCheck == -1)
-		{
-			BASS_WASAPI_Free();
-			playerState = OPENED;
-			playState = NOTPLAYING;
-			log_msg(LOG_DEBUG, "BASS WASAPI Device was not initialized, initializing\n");
+			check_bass_error("BASS Error Occured After BASS Init");
+
+			log_msg(LOG_DEBUG, "BASS WASAPI Device initializing\n");
 			BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
-		}
-		else
-		{
-			log_msg(LOG_DEBUG, "BASS_WASAPI_Init already done & device is operational, doing nothing\n");
-		}
-		
-		if(playerState != OPENED)
-		{
-			playerState = OPENED;
-		}
-		
-		log_msg(LOG_DEBUG, "Checking stream status\n");
-		if(BASS_ErrorGetCode() == 5)
-		{
-			log_msg(LOG_DEBUG, "Encountered BASS Error 5, reinitialize Decoder stream\n");
+			check_bass_error("BASS Error Occured After BASS Wasapi Init");
+
+			BASS_WASAPI_GetInfo(&info);
+			str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
+			check_bass_error("BASS Error Occured After Mixer Stream Init");
 			dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
+			check_bass_error("BASS Error Occured After Decoder Stream Init");
 			BASS_Mixer_StreamAddChannel(str, dec, 0);
-		}
-	}
-	else
-	if (noFiles == 0)
-	{
-		log_msg(LOG_DEBUG, "Audio library for commands is: BASS\n");
-		log_msg(LOG_DEBUG, "BASS_Init\n");
-		log_msg(LOG_DEBUG, "BASS Device initializing\n");
-		BASS_Init(0, 4800, 0, 0, NULL);
-		check_bass_error("BASS Error Occured After BASS Init");
+			log_msg(LOG_DEBUG, "Checking Player and Play Status\n");
+			check_bass_error("BASS Error occured after initializing player state check");
+			switch (playerState)
+			{
+				case OPENED:
+				{
+					log_msg(LOG_DEBUG, "Player Status: OPENED\n");
+					break;
+				}
+				case CLOSED:
+				{
+					log_msg(LOG_DEBUG, "Player Status: CLOSED\n");
+					log_msg(LOG_DEBUG, "Player Status should not be CLOSED on INIT, SETTING OPENED\n");
+					playerState = OPENED;
+					break;
+				}
+			}
+			switch (playState)
+			{
+				case PLAYING:
+				{
+					log_msg(LOG_DEBUG, "Play Status: PLAYING\n");
+					break;
+				}
+				case PAUSED:
+				{
+					log_msg(LOG_DEBUG, "Play Status: PAUSED\n");
+					break;
+				}
+				case STOPPED:
+				{
+					log_msg(LOG_DEBUG, "Play Status: STOPPED\n");
+					break;
+				}
+			}
+			log_msg(LOG_DEBUG, "BASS Device Number is: %d\n", BASS_GetDevice());
+			log_msg(LOG_DEBUG, "BASS WASAPI Device Number is: %d\n", BASS_WASAPI_GetDevice());
 		
-		log_msg(LOG_DEBUG, "BASS WASAPI Device initializing\n");
-		BASS_WASAPI_Init(-1, 0, 0, BASS_WASAPI_AUTOFORMAT, 0.1, 0, WasapiProc, NULL);
-		check_bass_error("BASS Error Occured After BASS Wasapi Init");
-
-		BASS_WASAPI_GetInfo(&info);
-		str = BASS_Mixer_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT);
-		check_bass_error("BASS Error Occured After Mixer Stream Init");
-		dec = BASS_StreamCreate(info.freq, info.chans, BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT, (STREAMPROC*)WasapiProc, 0);
-		check_bass_error("BASS Error Occured After Decoder Stream Init");
-		BASS_Mixer_StreamAddChannel(str, dec, 0);
-		initDone = YES;
-		log_msg(LOG_DEBUG, "Checking Player and Play Status\n");
-		check_bass_error("BASS Error occured after initializing player state check");
-		switch (playerState)
-		{
-			case OPENED:
-			{
-				log_msg(LOG_DEBUG, "Player Status: OPENED\n");
-				break;
-			}
-			case CLOSED:
-			{
-				log_msg(LOG_DEBUG, "Player Status: CLOSED\n");
-				log_msg(LOG_DEBUG, "Player Status should not be CLOSED on INIT, SETTING OPENED\n");
-				playerState = OPENED;
-				break;
-			}
-		}
-		switch (playState)
-		{
-			case PLAYING:
-			{
-				log_msg(LOG_DEBUG, "Play Status: PLAYING\n");
-				break;
-			}
-			case PAUSED:
-			{
-				log_msg(LOG_DEBUG, "Play Status: PAUSED\n");
-				break;
-			}
-			case STOPPED:
-			{
-				log_msg(LOG_DEBUG, "Play Status: STOPPED\n");
-				break;
-			}
-		}
-		log_msg(LOG_DEBUG, "BASS Device Number is: %d\n", BASS_GetDevice());
-		log_msg(LOG_DEBUG, "BASS WASAPI Device Number is: %d\n", BASS_WASAPI_GetDevice());
+			check_bass_error("BASS Error occured after playerState and playState check");
 		
-		check_bass_error("BASS Error occured after playerState and playState check");
-		
-		DWORD dataBuffer;
-		DWORD bufferSize = sizeof(dataBuffer);
-		DWORD dwVolume;
-		DWORD finalVolume = 0;
-		float wasapiVolume;
-		HKEY hkey;
-		if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\Cavedog Entertainment\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
-		{
-			printf("failed to open key");
-			return 1;
+			DWORD dataBuffer;
+			DWORD bufferSize = sizeof(dataBuffer);
+			DWORD dwVolume;
+			DWORD finalVolume = 0;
+			float wasapiVolume;
+			HKEY hkey;
+			if (RegOpenKeyExA(HKEY_CURRENT_USER, TEXT("SOFTWARE\\Cavedog Entertainment\\Total Annihilation"), 0, KEY_READ, &hkey) != ERROR_SUCCESS) 
+			{
+				printf("failed to open key");
+				return 1;
+			}
+
+			LRESULT status = RegQueryValueEx(
+			hkey,
+			TEXT("musicvol"),
+			NULL,
+			NULL,
+			(LPBYTE)&dataBuffer,
+			&bufferSize);
+
+			if (RegCloseKey(hkey) != ERROR_SUCCESS) 
+			{
+				printf("failed to close key");
+				return 1;
+			}
+
+			log_msg(LOG_DEBUG, "musicvol regkey status: %d\n", status);
+			log_msg(LOG_DEBUG, "musicvol regkey value: %d\n", dataBuffer);
+			log_msg(LOG_DEBUG, "musicvol regkey size: %d\n", bufferSize);
+			dwVolume = dataBuffer;
+			finalVolume = dwVolume * 156.25;
+			log_msg(LOG_DEBUG, "BASS initial stream volume set at: %d\n", finalVolume);
+			WasapiVolumeConfig(finalVolume);
+			audio_inited = 1;  // marks that init was attempted
 		}
-
-		LRESULT status = RegQueryValueEx(
-		hkey,
-		TEXT("musicvol"),
-		NULL,
-		NULL,
-		(LPBYTE)&dataBuffer,
-		&bufferSize);
-
-		if (RegCloseKey(hkey) != ERROR_SUCCESS) 
-		{
-			printf("failed to close key");
-			return 1;
-		}
-
-		log_msg(LOG_DEBUG, "musicvol regkey status: %d\n", status);
-		log_msg(LOG_DEBUG, "musicvol regkey value: %d\n", dataBuffer);
-		log_msg(LOG_DEBUG, "musicvol regkey size: %d\n", bufferSize);
-		dwVolume = dataBuffer;
-		finalVolume = dwVolume * 156.25;
-		log_msg(LOG_DEBUG, "BASS initial stream volume set at: %d\n", finalVolume);
-		WasapiVolumeConfig(finalVolume);
-	}
-	return 0;
+    }
+    LeaveCriticalSection(&audio_cs);
+    return TRUE;
 }
 
 int bass_pause()
@@ -1167,6 +1178,7 @@ void WINAPI fake_ExitProcess(UINT uExitCode)
 	
 	DeleteCriticalSection(&cs);
 	DeleteCriticalSection(&wproc_cs);
+	DeleteCriticalSection(&audio_cs);
 	DeleteCriticalSection(&log_cs);
 	if (fh)
 	{
@@ -1195,6 +1207,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		
 		InitializeCriticalSection(&cs);
 		init_wgmus(hinstDLL);
+		InitializeCriticalSection(&audio_cs);
 	}
 
 	if (fdwReason == DLL_PROCESS_DETACH)
