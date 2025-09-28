@@ -942,6 +942,10 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			else
 			if (msg == MCI_PAUSE)
 			{
+				EnterCriticalSection(&audio_cs);
+				playState == PAUSED;
+				ps = playState;
+				LeaveCriticalSection(&audio_cs);
 				if(ps != NOTREADY)
 				{
 					log_msg(LOG_DEBUG, "MCI_PAUSE\n");
@@ -972,9 +976,21 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 			{
 				if(ps != NOTREADY)
 				{
+					log_msg(LOG_DEBUG, "MCI_STOP\n");
+					EnterCriticalSection(&audio_cs);
+					playState == STOPPED;
+					ps = playState;
+					LeaveCriticalSection(&audio_cs);
+					if(ps == STOPPED)
+					{
+						log_msg(LOG_DEBUG, "playState was stopped when stop was called for\n");
+						bass_stop();
+						msg = 0;
+						return 0;
+					}
 					if(ps != STOPPED)
 					{
-						log_msg(LOG_DEBUG, "MCI_STOP\n");
+						log_msg(LOG_DEBUG, "playState was not stopped when stop was called for\n");
 						bass_stop();
 						msg = 0;
 						return 0;
