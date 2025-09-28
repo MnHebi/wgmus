@@ -910,6 +910,13 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 		EnterCriticalSection(&audio_cs);
 		int ps = playState;
 		int ct = currentTrack;
+		nextTrack = currentTrack + 1;
+		if (nextTrack > 17)
+		{
+			nextTrack = 2;
+		}
+		int nt = nextTrack;
+		int pmode = PlaybackMode;
 		UINT msg = uintMsg;
 		uintMsg = 0;
 		DWORD_PTR dwpcmd = dwptrCmd;
@@ -1023,9 +1030,9 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 
 				parms->dwReturn = 0;
 				
-				if (PlaybackMode == CD)
+				if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
 				{
-					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
+					if (pmode == CD)
 					{
 						log_msg(LOG_DEBUG, "MCI_STATUS_NUMBER_OF_TRACKS %d\n", cdTracks);
 						parms->dwReturn = cdTracks;
@@ -1033,7 +1040,19 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						return 0;
 					}
 					else
-					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
+					if (pmode == MUSICFILE)
+					{
+						log_msg(LOG_DEBUG, "MCI_STATUS_NUMBER_OF_TRACKS %d\n", numTracks);
+						parms->dwReturn = numTracks;
+						msg = 0;
+						return 0;
+					}
+				}
+				else
+				if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
+				{
+					log_msg(LOG_DEBUG, "MCI_CDA_STATUS_TYPE_TRACK\n");
+					if (pmode == CD)
 					{
 						log_msg(LOG_DEBUG, "MCI_CDA_STATUS_TYPE_TRACK\n");
 						if((parms->dwTrack > 0) &&  (parms->dwTrack <= MAX_TRACKS))
@@ -1058,19 +1077,62 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 						}
 					}
 					else
-					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
+					if (pmode == MUSICFILE)
+					{
+						log_msg(LOG_DEBUG, "MCI_CDA_TRACK_OTHER\n");
+						if((parms->dwTrack == 1) &&  (parms->dwTrack < MAX_TRACKS))
+						{
+							parms->dwReturn = MCI_CDA_TRACK_OTHER;
+							msg = 0;
+							return 0;
+						}
+					}
+				}
+				else
+				if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
+				{
+					if (pmode == CD)
 					{
 						currentTrack++;
 						parms->dwReturn = currentTrack;
-						log_msg(LOG_DEBUG, "Sending current track: %d\n", currentTrack);
+						log_msg(LOG_DEBUG, "Sending current track for CD mode: %d\n", currentTrack);
 						msg = 0;
 						return 0;
 					}
-					else
-					if (parms->dwItem == MCI_STATUS_POSITION)
+					if (pmode == MUSICFILE)
 					{
-						log_msg(LOG_DEBUG, "MCI_STATUS_POSITION\n");
-						
+						log_msg(LOG_DEBUG, "Sending current track for MUSICFILE mode: %d\n", currentTrack);
+						parms->dwReturn = currentTrack;
+						msg = 0;
+						return 0;
+					}
+				}
+				else
+				if (parms->dwItem == MCI_STATUS_POSITION)
+				{
+					log_msg(LOG_DEBUG, "MCI_STATUS_POSITION\n");
+					if (dwpcmd & MCI_TRACK)
+					{
+						log_msg(LOG_DEBUG, "MCI_TRACK\n");
+						if (pmode == CD)
+						{
+							parms->dwTrack -= 1;
+							queriedCdTrack = parms->dwTrack;
+							parms->dwReturn = queriedCdTrack;
+							log_msg(LOG_DEBUG, "sent track for CD mode\n");
+							msg = 0;
+							return 0;
+						}
+						if (pmode == MUSICFILE)
+						{
+							parms->dwReturn = nt;
+							log_msg(LOG_DEBUG, "sent next track %d for MUSICFILE mode\n", nt);
+							msg = 0;
+							return 0;
+						}
+					}
+					else
+					{
 						bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
 						log_msg(LOG_DEBUG, "BASS Length in seconds: %d\n", bassLengthInSeconds);
 						bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
@@ -1102,185 +1164,26 @@ MCIERROR WINAPI wgmus_mciSendCommandA(MCIDEVICEID deviceID, UINT uintMsg, DWORD_
 							bassSeconds = 0;
 						}
 						bassFrames = bassSeconds*75/1000;
-						currentTrack++;
 						log_msg(LOG_DEBUG, "currentTrack: %d\n", currentTrack);
 						log_msg(LOG_DEBUG, "bassFrames: %d\n", bassFrames);
 						log_msg(LOG_DEBUG, "bassMilliseconds: %d\n", bassMilliseconds);
 						log_msg(LOG_DEBUG, "bassSeconds: %d\n", bassSeconds);
 						log_msg(LOG_DEBUG, "bassMinutes: %d\n", bassMinutes);
 						log_msg(LOG_DEBUG, "bassHours: %d\n", bassHours);
-						log_msg(LOG_DEBUG, "sent track position\n");
-						if (dwpcmd & MCI_TRACK)
+						if (pmode == CD)
 						{
-							log_msg(LOG_DEBUG, "MCI_TRACK\n");
 							parms->dwTrack -= 1;
 							queriedCdTrack = parms->dwTrack;
-							if(timeFormat == MCI_FORMAT_MILLISECONDS)
-							{
-								queriedCdTrack += 1;
-								parms->dwReturn += bassMilliseconds;
-								msg = 0;
-								return 0;
-							}
-							else
-							if(timeFormat == MCI_FORMAT_TMSF)
-							{
-								queriedCdTrack += 1;
-								parms->dwReturn = MCI_MAKE_TMSF(queriedCdTrack, 0, 0, 0);
-								msg = 0;
-								return 0;
-							}
-						}
-						else
-						if(timeFormat == MCI_FORMAT_MILLISECONDS)
-						{
-							log_msg(LOG_DEBUG, "MCI_FORMAT_MILLISECONDS\n");
-							currentTrack++;
-							parms->dwReturn += bassMilliseconds;
+							parms->dwReturn = queriedCdTrack;
+							log_msg(LOG_DEBUG, "sent track position for CD mode\n");
 							msg = 0;
 							return 0;
 						}
 						else
-						if(timeFormat == MCI_FORMAT_TMSF)
+						if (pmode == MUSICFILE)
 						{
-							log_msg(LOG_DEBUG, "MCI_FORMAT_TMSF\n");
-							currentTrack++;
-							parms->dwReturn = MCI_MAKE_TMSF(currentTrack, bassMinutes, bassSeconds, bassFrames);
-							msg = 0;
-							return 0;
-						}
-					}
-					if (parms->dwItem == MCI_STATUS_MODE)
-					{
-						log_msg(LOG_DEBUG, "MCI_STATUS_MODE\n");
-						if(ps == INIT)
-						{
-							log_msg(LOG_DEBUG, "we are open\n");
-							parms->dwReturn = MCI_MODE_OPEN;
-							msg = 0;
-							return 0;
-						}
-						else
-						if(ps == NOTREADY)
-						{
-							log_msg(LOG_DEBUG, "player not ready\n");
-							parms->dwReturn = MCI_MODE_NOT_READY;
-							msg = 0;
-							return 0;
-						}							
-						else
-						if(ps == PAUSED)
-						{
-							log_msg(LOG_DEBUG, "we are paused\n");
-							parms->dwReturn = MCI_MODE_PAUSE;
-							msg = 0;
-							return 0;
-						}
-						else
-						if(ps == STOPPED)
-						{
-							log_msg(LOG_DEBUG, "we are stopped\n");
-							parms->dwReturn = MCI_MODE_STOP;
-							msg = 0;
-							return 0;
-						}
-						else
-						if(ps == PLAYING)
-						{
-							log_msg(LOG_DEBUG, "we are playing\n");
-							parms->dwReturn = MCI_MODE_PLAY;
-							msg = 0;
-							return 0;
-						}
-					}
-					return 0;
-				}
-				else
-				if (PlaybackMode == MUSICFILE)
-				{
-					if (parms->dwItem == MCI_STATUS_NUMBER_OF_TRACKS)
-					{
-						log_msg(LOG_DEBUG, "MCI_STATUS_NUMBER_OF_TRACKS %d\n", numTracks);
-						parms->dwReturn = numTracks;
-						msg = 0;
-						return 0;
-					}
-					else
-					if (parms->dwItem == MCI_CDA_STATUS_TYPE_TRACK)
-					{
-						log_msg(LOG_DEBUG, "MCI_CDA_STATUS_TYPE_TRACK MCI_CDA_TRACK_OTHER\n");
-						if((parms->dwTrack == 1) &&  (parms->dwTrack < MAX_TRACKS))
-						{
-							parms->dwReturn = MCI_CDA_TRACK_OTHER;
-							msg = 0;
-							return 0;
-						}
-					}
-					else
-					if (parms->dwItem == MCI_STATUS_CURRENT_TRACK)
-					{
-						log_msg(LOG_DEBUG, "Sending current track: %d\n", currentTrack);
-						parms->dwReturn = currentTrack;
-						msg = 0;
-						return 0;
-					}
-					else
-					if (parms->dwItem == MCI_STATUS_POSITION)
-					{
-						log_msg(LOG_DEBUG, "MCI_STATUS_POSITION\n");
-						if (dwpcmd & MCI_TRACK)
-						{
-							nextTrack = currentTrack + 1;
-							if (nextTrack > 17)
-							{
-								nextTrack = 2;
-							}
-							log_msg(LOG_DEBUG, "sent next track %d starting position\n", nextTrack);
-							parms->dwReturn = nextTrack;
-							msg = 0;
-							return 0;
-						}
-						else
-						{
-							bassLengthInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetLength(dec, BASS_POS_BYTE));
-							log_msg(LOG_DEBUG, "BASS Length in seconds: %d\n", bassLengthInSeconds);
-							bassPosInSeconds = BASS_ChannelBytes2Seconds(dec, BASS_ChannelGetPosition(dec, BASS_POS_BYTE));
-							log_msg(LOG_DEBUG, "BASS Position in seconds: %d\n", bassPosInSeconds);
-							bassFrames = 0;
-							bassMilliseconds = 0;
-							bassSeconds = 0;
-							bassMinutes = 0;
-							bassHours = 0;
-							bassHours = (bassPosInSeconds/3600);
-							bassMilliseconds = bassPosInSeconds*1000;
-							if(bassMilliseconds < 0)
-							{
-								bassMilliseconds = 0;
-							}
-							bassMinutes = bassPosInSeconds/60;
-							if(bassMinutes < 0)
-							{
-								bassMinutes = 0;
-							}
-							if(bassMinutes == 0)
-							{
-								bassSeconds = bassPosInSeconds;
-							}
-							else
-							bassSeconds = (bassPosInSeconds -(bassMinutes*60));
-							if(bassSeconds < 0)
-							{
-								bassSeconds = 0;
-							}
-							bassFrames = bassSeconds*75/1000;
-							log_msg(LOG_DEBUG, "currentTrack: %d\n", currentTrack);
-							log_msg(LOG_DEBUG, "bassFrames: %d\n", bassFrames);
-							log_msg(LOG_DEBUG, "bassMilliseconds: %d\n", bassMilliseconds);
-							log_msg(LOG_DEBUG, "bassSeconds: %d\n", bassSeconds);
-							log_msg(LOG_DEBUG, "bassMinutes: %d\n", bassMinutes);
-							log_msg(LOG_DEBUG, "bassHours: %d\n", bassHours);
 							parms->dwReturn = currentTrack;
-							log_msg(LOG_DEBUG, "sent track position\n");
+							log_msg(LOG_DEBUG, "sent track position for MUSICFILE mode\n");
 							msg = 0;
 							return 0;
 						}
