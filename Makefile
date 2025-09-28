@@ -1,10 +1,10 @@
 REV=$(shell sh -c 'git rev-parse --short @{0}')
 
-all: emusi.dll
+all: wgmus.dll
 
 
-emusi.dll: wgmus.c rwinmm.c wgmus.def
-	mingw32-gcc -std=gnu99 -Wl,--enable-stdcall-fixup -Ilibs/include -O2 -shared -s -o emusi.dll wgmus.c rwinmm.c wgmus.def -L. -lwinmm -lbass -lbasscd -lbassflac -lbassmix -lbasswasapi -D_DEBUG -static-libgcc
+wgmus.dll: wgmus.c rwinmm.c wgmus.def
+	i686-w64-mingw32-gcc -std=gnu99 -Wl,--enable-stdcall-fixup -Ilibs/include -O2 -shared -s -o wgmus.dll wgmus.c wgmus_ini_helpers.c rwinmm.c wgmus.def -L. -lwinmm -lbass -lbasscd -lbassflac -lbassmix -lbasswasapi -D_DEBUG -static-libgcc
 
 clean:
-	rm -f emusi.dll
+	rm -f wgmus.dll
